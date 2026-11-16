@@ -29,7 +29,7 @@ It works in the terminal, in Claude Desktop and on a local web page, on macOS an
 
 - Claude Code with mods (function hooks).
 - [Bun](https://bun.sh) on your PATH. The collector and the local web server run on Bun.
-- macOS or Windows. Linux should work but is untested.
+- macOS or Windows.
 
 ## Install
 
