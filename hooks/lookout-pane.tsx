@@ -135,8 +135,20 @@ async function openInTerminal($: EngineInterface, session: HubSession): Promise<
     await openTab($, { title: session.name, command: ['claude', 'attach', session.sessionId] }, 'Attach')
     return
   }
+  const tab = session.title && session.title !== session.name ? `"${session.title}" (${session.name})` : `"${session.name}"`
+  let os: Awaited<ReturnType<typeof platform>> | undefined
   try {
-    const os = await platform($)
+    os = await platform($)
+    if (os === 'windows') {
+      const argv = focusSessionArgv(os, undefined, { titles: [session.title, session.name] })
+      if (argv) {
+        const result = await $.process.run(argv, { timeoutMs: 15_000 })
+        if (result.stdout.trim() === 'ok') {
+          await update($, notice, () => `Switched to "${label(session)}".`)
+          return
+        }
+      }
+    }
     if (os === 'mac' && session.pid) {
       const ps = await $.process.run(processInfoArgv(session.pid), { timeoutMs: 5_000 })
       const info = parseProcessInfo(ps.stdout)
@@ -156,7 +168,13 @@ async function openInTerminal($: EngineInterface, session: HubSession): Promise<
       }
     }
   } catch {}
-  await update($, notice, () => `Switch to the terminal tab "${session.name}": its tab was not found.`)
+  const text =
+    os === 'windows'
+      ? `No Windows Terminal tab shows ${tab}. Switch to it yourself.`
+      : os === 'mac'
+        ? `The tab of ${tab} was not found. Switch to it yourself.`
+        : `Switch to the terminal tab ${tab} yourself.`
+  await update($, notice, () => text)
 }
 
 async function cycleAgent($: EngineInterface, session: HubSession): Promise<void> {

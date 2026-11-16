@@ -586,9 +586,9 @@ async function focusAct(act) {
       const result = await post('/api/focus', { sessionId: s.sessionId })
       if (result.isTab) toast(`Switched to "${titleOf(s)}" in the terminal`)
       else if (result.reason === 'permission') toast('Allow Lookout to control your terminal: System Settings, Privacy & Security, Automation', true)
-      else toast(result.ok ? `Terminal in front: the session is the tab "${s.name}"` : `Switch to the terminal tab "${s.name}"`)
+      else toast(result.ok ? `Terminal in front: switch to the tab "${titleOf(s)}"` : `Switch to the terminal tab "${titleOf(s)}" yourself`)
     } catch {
-      toast(`Switch to the terminal tab "${s.name}"`)
+      toast(`Switch to the terminal tab "${titleOf(s)}" yourself`)
     }
     return
   }

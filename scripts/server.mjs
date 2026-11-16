@@ -398,6 +398,14 @@ async function handleApi(request, url) {
   if (path === '/api/focus' && request.method === 'POST') {
     const { sessionId } = await body(request)
     const reg = typeof sessionId === 'string' ? findRegistration(sessionId) : undefined
+    if (reg && OS === 'windows') {
+      const argv = focusSessionArgv(OS, undefined, { titles: [sessionTitle(reg.sessionId), reg.name] })
+      if (argv) {
+        const result = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', timeout: 15000, windowsHide: true })
+        if ((result.stdout || '').trim() === 'ok') return json({ ok: true, isTab: true })
+      }
+      return json({ ok: false, reason: 'tab not found' })
+    }
     if (reg?.pid && OS === 'mac') {
       const ps = spawnSync(processInfoArgv(reg.pid)[0], processInfoArgv(reg.pid).slice(1), { encoding: 'utf8', timeout: 3000 })
       const info = parseProcessInfo(ps.stdout || '')

@@ -83,12 +83,74 @@ function usableTitles(values: (string | undefined)[]): string[] {
   return [...new Set(values.map(one => (one ?? '').replace(/[\r\n]+/g, ' ').trim()).filter(one => one.length >= 4 && one !== 'Claude Code'))]
 }
 
+function psString(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`
+}
+
+/** PowerShell's -EncodedCommand takes the script as UTF-16LE in base64, so no quote of it is mangled on the way. */
+function encodedPowerShell(script: string): string[] {
+  let bytes = ''
+  for (let index = 0; index < script.length; index++) {
+    const unit = script.charCodeAt(index)
+    bytes += String.fromCharCode(unit & 0xff, unit >> 8)
+  }
+  return ['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', btoa(bytes)]
+}
+
 /**
- * Brings the tab of a running interactive session to the front, macOS only. The script prints "ok" when it found the tab.
- * Ghostty is matched by tab title, then by folder when exactly one tab there belongs to no other session;
- * Terminal.app and iTerm by the session's terminal device. With `isDryRun` the script only prints what it would focus.
+ * Windows Terminal through UI Automation: finds the tab whose title holds the session's title in any Windows Terminal
+ * window, selects it and brings that window to the front. Prints "ok" when it found the tab, "none" otherwise.
+ */
+function windowsTerminalFocus(titles: string[], isDryRun: boolean): string[] {
+  const script = `$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class LookoutWindow {
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr handle);
+  [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr handle, int command);
+  [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr handle);
+  [DllImport("user32.dll")] public static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
+}
+"@
+$wanted = @(${titles.map(psString).join(', ')})
+$A = [System.Windows.Automation.AutomationElement]
+$byClass = New-Object System.Windows.Automation.PropertyCondition($A::ClassNameProperty, 'CASCADIA_HOSTING_WINDOW_CLASS')
+$byTab = New-Object System.Windows.Automation.PropertyCondition($A::ControlTypeProperty, [System.Windows.Automation.ControlType]::TabItem)
+foreach ($window in $A::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, $byClass)) {
+  foreach ($tab in $window.FindAll([System.Windows.Automation.TreeScope]::Descendants, $byTab)) {
+    $name = $tab.Current.Name
+    foreach ($title in $wanted) {
+      if ($name -and $name.Contains($title)) {
+${isDryRun ? `        Write-Output ("ok " + $name)
+        exit 0` : `        $tab.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern).Select()
+        $handle = [IntPtr]$window.Current.NativeWindowHandle
+        if ([LookoutWindow]::IsIconic($handle)) { [void][LookoutWindow]::ShowWindowAsync($handle, 9) }
+        [LookoutWindow]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero)
+        [LookoutWindow]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+        [void][LookoutWindow]::SetForegroundWindow($handle)
+        Write-Output 'ok'
+        exit 0`}
+      }
+    }
+  }
+}
+Write-Output 'none'`
+  return encodedPowerShell(script)
+}
+
+/**
+ * Brings the tab of a running interactive session to the front. The script prints "ok" when it found the tab.
+ * macOS: Ghostty is matched by tab title, then by folder when exactly one tab there belongs to no other session;
+ * Terminal.app and iTerm by the session's terminal device. Windows: Windows Terminal by tab title.
+ * With `isDryRun` the script only prints what it would focus.
  */
 export function focusSessionArgv(os: Platform, terminal: string | undefined, target: FocusTarget, isDryRun = false): string[] | null {
+  if (os === 'windows') {
+    const titles = usableTitles(target.titles)
+    return titles.length ? windowsTerminalFocus(titles, isDryRun) : null
+  }
   if (os !== 'mac') return null
   const hit = (what: string, steps: string) => (isDryRun ? `return "ok " & ${what}` : `${steps}\nreturn "ok"`)
   if (terminal === 'ghostty') {

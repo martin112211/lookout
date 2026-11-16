@@ -12,7 +12,7 @@ It works in the terminal, in Claude Desktop and on a local web page, on macOS an
 
 - **One overview.** Every live session, grouped by repository and branch, with its status, its open question or approval, unread replies, recent activity, running agents and context fill.
 - **See what an agent does.** Click a subagent and follow it live: its task, each tool call and what came back.
-- **Jump to a session.** "Open" brings the session's own terminal tab to the front (macOS: Ghostty, Terminal, iTerm).
+- **Jump to a session.** "Open" brings the session's own terminal tab to the front (macOS: Ghostty, Terminal, iTerm; Windows: Windows Terminal).
 - **Answer from one place.** Pick an option with a number key, type your own answer or write to a session. It arrives as your own input.
 - **Catch-up.** "Since your last look" lists commits, finished agents, compactions and files two sessions share. A recap appears above the prompt when you return to a session.
 - **Session briefs.** Goal, decisions, next step and blocker for every session, written by a small model after each turn and handed back after compaction. The session's goal and next step stay pinned above the prompt (switch off in Settings: "Brief pinned above the prompt").
@@ -73,9 +73,20 @@ Keys on the web page: `j` and `k` select, `n` next open item, `1` to `9` answer,
 | Settings | `/lookout settings` | `/lookout settings` | Settings tab, all values |
 | Status line, `/git` | yes | yes | |
 
-"Open in terminal" switches to the tab the session already runs in. On macOS this works in Ghostty (1.3 or later, found by tab title or folder), Terminal and iTerm (found by the session's terminal device); the first time, macOS asks you to allow Automation. Elsewhere Lookout tells you which tab to switch to. A background session (`claude --bg`) opens with `claude attach` in a new tab.
+"Open in terminal" switches to the tab the session already runs in. "Fork" opens a copy of the session in a new tab or window. Which terminals support what:
 
-"Fork" opens a new tab: Windows Terminal (`wt`) on Windows, and on macOS a Ghostty window when the session runs in Ghostty, else a Terminal window.
+| Terminal | Open (switch to the session's tab) | Fork (new tab or window) |
+|---|---|---|
+| Ghostty 1.3 or later (macOS) | yes, found by tab title, else by folder | new Ghostty window |
+| Terminal (macOS) | yes, found by the session's terminal device | new Terminal window |
+| iTerm2 (macOS) | yes, found by the session's terminal device | new Terminal window |
+| Windows Terminal | yes, found by tab title through UI Automation in PowerShell | new Windows Terminal tab |
+| WezTerm, kitty, Alacritty, Warp, the VS Code terminal (macOS) | no: Lookout names the tab to switch to | new Terminal window |
+| Other Windows terminals (VS Code, ConEmu, a plain console window) | no: Lookout names the tab to switch to | new Windows Terminal tab, if Windows Terminal is installed |
+
+- On macOS, the first "Open" asks you to allow Automation (Privacy & Security). Without it, Lookout names the tab instead.
+- Open finds a tab by its title only while the terminal shows the title Claude Code sets. With title changes switched off (in Windows Terminal: "Suppress title changes"), Lookout names the tab instead.
+- A background session (`claude --bg`) opens with `claude attach` in a new tab or window, as Fork does.
 
 The web page has three looks, each light and dark, and works at phone width.
 
@@ -136,6 +147,7 @@ What Lookout runs on your machine:
 - **git** reads status, branches, recent commits and diffs for the status line, `/git`, the repo cards and "Show diff". Lookout never commits or pushes on its own; "Commit" on the page sends the session a request to do it.
 - **ps** reads the terminal device and terminal app of a session's process, so "Open" can find its tab. **uname** tells macOS from Linux.
 - **osascript** (macOS only) brings a session's Ghostty, Terminal or iTerm tab to the front when you press "Open", opens a Terminal window for "Fork", and brings the terminal forward from the page. macOS asks you to allow this under Privacy & Security, Automation.
+- **powershell.exe** (Windows only) finds a session's Windows Terminal tab by its title with UI Automation, selects it and brings its window to the front when you press "Open".
 - **Terminal and browser openers**: `open` (macOS), `wt` (Windows Terminal) or `x-terminal-emulator` start a new tab for "Fork" and "Attach"; `open`, `rundll32` or `xdg-open` open the web page in your browser.
 - Network: the hooks talk only to Lookout's own server on 127.0.0.1. The only requests that leave your machine are the two optional model calls above, made through Claude Code.
 

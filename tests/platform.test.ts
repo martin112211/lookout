@@ -32,7 +32,19 @@ describe('platform', () => {
     expect(focusSessionArgv('mac', 'Apple_Terminal', target)?.[2]).toContain('if tty of t is "/dev/ttys004"')
     expect(focusSessionArgv('mac', 'Apple_Terminal', { ...target, tty: undefined })).toBeNull()
     expect(focusSessionArgv('mac', 'WezTerm', target)).toBeNull()
-    expect(focusSessionArgv('windows', 'ghostty', target)).toBeNull()
+  })
+
+  test('Open on Windows selects the Windows Terminal tab by title through UI Automation', async () => {
+    const argv = focusSessionArgv('windows', undefined, { titles: ["Fix Ana's login", undefined, 'Claude Code', 'ab'] }) ?? []
+    expect(argv.slice(0, 6)).toEqual(['powershell.exe', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand'])
+    const bytes = atob(argv[6] ?? '')
+    let script = ''
+    for (let index = 0; index < bytes.length; index += 2) script += String.fromCharCode(bytes.charCodeAt(index) | (bytes.charCodeAt(index + 1) << 8))
+    expect(script).toContain("$wanted = @('Fix Ana''s login')")
+    expect(script).toContain('CASCADIA_HOSTING_WINDOW_CLASS')
+    expect(script).toContain('SelectionItemPattern]::Pattern).Select()')
+    expect(script.split('{').length).toBe(script.split('}').length)
+    expect(focusSessionArgv('windows', undefined, { titles: ['Claude Code'] })).toBeNull()
   })
 
   test('the browser opener follows the platform', async () => {
