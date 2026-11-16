@@ -90,6 +90,8 @@ $('overview').addEventListener('click', event => {
     return
   }
   const row = event.target.closest('.srow')
+  const agentChip = event.target.closest('[data-agent-open]')
+  if (row && agentChip) return select(row.dataset.id, { agent: agentChip.dataset.agentOpen })
   if (row) select(row.dataset.id)
 })
 $('overview').addEventListener('keydown', event => {
@@ -107,6 +109,9 @@ $('focus').addEventListener('click', event => {
   if (review) return reviewAct(review.dataset.review)
   const copyBtn = t.closest('[data-copy]')
   if (copyBtn) return copy(copyBtn.dataset.copy, 'Command')
+  if (t.closest('[data-agent-close]')) return closeAgent()
+  const agentBtn = t.closest('button[data-agent]')
+  if (agentBtn) return openAgent(agentBtn.dataset.agent)
   const act = t.closest('[data-act]')
   if (act) return focusAct(act.dataset.act)
   if (t.closest('#send')) return send()
@@ -143,9 +148,10 @@ $('tab-settings').addEventListener('click', event => {
   if (profileBtn) return setProfile(profileBtn.dataset.profile)
   const replay = event.target.closest('[data-replay]')
   if (replay) return loadReplay(Number(replay.dataset.replay))
-  const lookBtn = event.target.closest('[data-look]')
+  // Buttons only: <html> carries data-look and data-mode too, so a bare closest() would always match it.
+  const lookBtn = event.target.closest('button[data-look]')
   if (lookBtn) return setLook({ look: lookBtn.dataset.look })
-  const modeBtn = event.target.closest('[data-mode]')
+  const modeBtn = event.target.closest('button[data-mode]')
   if (modeBtn) return setLook({ mode: modeBtn.dataset.mode })
 })
 
@@ -207,4 +213,5 @@ loadSettings()
 refresh().then(look)
 setInterval(refresh, 3000)
 setInterval(() => { if (state.selected && state.tab === 'overview') loadDetail() }, 5000)
+setInterval(() => { if (state.agent && state.tab === 'overview' && state.agentDetail?.state !== 'done') loadAgent() }, 2000)
 setInterval(() => { if (state.tab === 'decisions') loadLedger() }, 60_000)

@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 import type { On } from './on'
 
-import type { HubBrief, HubDetail, HubLedgerEntry, HubLiveItem, HubSession } from '../types'
+import type { HubAgentDetail, HubBrief, HubDetail, HubLedgerEntry, HubLiveItem, HubSession } from '../types'
 import { CLASSIFIER_MODES, EFFORT_CHOICES, FEATURE_LABELS, applyProfile, MODEL_CHOICES, TIERS, draftRoute, routeAgent, routeTier } from './settings'
 import { classifiedTier, modelRank, nextEffortUp, nextModelUp } from './routing'
 import type { RouteDecision, RouteInput } from './routing'
@@ -25,6 +25,7 @@ export const sessions = atom({ plugin: 'lookout', key: 'sessions' } as const, []
 export const refreshedAt = atom({ plugin: 'lookout', key: 'refreshedAt' } as const, 0)
 export const selected = atom({ plugin: 'lookout', key: 'selected' } as const, null)
 export const detail = atom({ plugin: 'lookout', key: 'detail' } as const, null, { shape: 'detail-1' })
+export const agentView = atom({ plugin: 'lookout', key: 'agentView' } as const, null as HubAgentDetail | null, { shape: 'agent-1' })
 export const notice = atom({ plugin: 'lookout', key: 'notice' } as const, null)
 export const selfId = atom({ plugin: 'lookout', key: 'selfId' } as const, null)
 
@@ -78,6 +79,8 @@ export async function collect($: EngineInterface): Promise<void> {
     }
     const list = JSON.parse(result.stdout) as HubSession[]
     await update($, sessions, () => list)
+    const open = await read($, agentView)
+    if (open && open.state !== 'done') await loadAgent($, open.sessionId, open.agentId)
     const now = await $.clock.now()
     await update($, refreshedAt, () => now)
   } catch (error) {
@@ -98,6 +101,21 @@ async function migrateLegacyData($: EngineInterface): Promise<void> {
   } catch {}
 }
 
+/** One subagent's live steps for the pane; null closes the view. */
+export async function loadAgent($: EngineInterface, sessionId: string, agentId: string | null): Promise<void> {
+  if (!agentId) {
+    await update($, agentView, () => null)
+    return
+  }
+  const result = await $.process.run(['bun', `${$.plugin.root}/scripts/collect.mjs`, '--agent', sessionId, agentId, '12'], { timeoutMs: 20_000 })
+  if (result.exitCode !== 0) {
+    await update($, notice, () => `Agent failed: ${result.stderr.slice(0, 200)}`)
+    return
+  }
+  const value = JSON.parse(result.stdout) as HubAgentDetail | null
+  await update($, agentView, () => value)
+}
+
 export async function loadDetail($: EngineInterface, sessionId: string): Promise<void> {
   const result = await $.process.run(
     ['bun', `${$.plugin.root}/scripts/collect.mjs`, '--detail', sessionId, String(DETAIL_COUNT)],
@@ -114,6 +132,7 @@ export async function loadDetail($: EngineInterface, sessionId: string): Promise
 export async function select($: EngineInterface, sessionId: string | null): Promise<void> {
   await update($, selected, () => sessionId)
   await update($, detail, () => null)
+  await update($, agentView, () => null)
   await update($, notice, () => null)
   if (sessionId) await loadDetail($, sessionId)
 }

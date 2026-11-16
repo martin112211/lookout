@@ -119,7 +119,7 @@ function leasesOf(session) {
 function chipsOf(session) {
   const chips = []
   for (const a of (session.agents || []).slice(0, 4)) {
-    chips.push(`<span class="chip m${a.state === 'done' ? ' done' : ''}" style="--mc:${modelColor(a.model)}">${esc(modelKey(a.model) || '?')} · ${esc(a.type || 'agent')}${a.state === 'running' ? ' ●' : a.state === 'stalled' ? ' ?' : ''}</span>`)
+    chips.push(`<span class="chip m${a.state === 'done' ? ' done' : ''}" data-agent-open="${esc(a.id)}" title="Show what this agent does" style="--mc:${modelColor(a.model)}">${esc(modelKey(a.model) || '?')} · ${esc(a.type || 'agent')}${a.state === 'running' ? ' ●' : a.state === 'stalled' ? ' ?' : ''}</span>`)
   }
   for (const f of session.shared || []) chips.push(`<span class="chip x" title="${esc(`Also edited by ${f.others.join(', ')}`)}">shares ${esc(folderOf(f.path))}</span>`)
   for (const l of leasesOf(session)) chips.push(`<span class="chip l">holds ${esc(l.purpose || l.key)} lock</span>`)
@@ -138,7 +138,7 @@ function renderOverview(force = false) {
   const html = list.map((repo, ri) => {
     const rows = []
     repo.branches.forEach(([name, sessions], bi) => {
-      rows.push(`<div class="brow" data-b="${bi}">${repo.isGit ? '⎇ ' : ''}${esc(name)} <span class="c">${sessions.length} session${sessions.length > 1 ? 's' : ''}</span></div>`)
+      rows.push(`<div class="brow" data-b="${bi}"><span class="bl">${repo.isGit ? '⎇ ' : ''}${esc(name)}</span><span class="c">${sessions.length} session${sessions.length > 1 ? 's' : ''}</span></div>`)
       for (const s of sessions) {
         const st = stateOf(s)
         const isSel = state.selected === s.sessionId
@@ -165,6 +165,7 @@ function renderOverview(force = false) {
   $('overview').dataset.sig = html
   if (focusedId) document.querySelector(`.srow[data-id="${CSS.escape(focusedId)}"]`)?.focus()
   requestAnimationFrame(() => drawRails(list))
+  document.fonts?.ready.then(() => drawRails(list))
 }
 
 function drawRails(list) {
@@ -181,7 +182,11 @@ function drawRails(list) {
     repo.branches.forEach((_, bi) => {
       const mine = rows.filter(r => Number(r.dataset.b) === bi)
       const color = `var(--b${(bi % 4) + 1})`
-      const ys = mine.map(r => r.getBoundingClientRect().top - top + 15)
+      // Centre each node on the row's own anchor: the status dot of a session, the label of a branch.
+      const ys = mine.map(r => {
+        const box = (r.querySelector('.h .dot') || r.querySelector('.bl') || r).getBoundingClientRect()
+        return Math.round(box.top + box.height / 2 - top)
+      })
       if (!ys.length) return
       const x = xFor(bi)
       if (bi > 0) {
@@ -190,7 +195,7 @@ function drawRails(list) {
       }
       out += `<line x1="${x}" y1="${ys[0]}" x2="${x}" y2="${ys.at(-1)}" stroke="${color}" stroke-width="2"/>`
       ys.forEach((y, i) => {
-        out += i === 0 ? `<circle cx="${x}" cy="${y - 4}" r="4.5" fill="var(--panel)" stroke="${color}" stroke-width="2"/>` : `<circle cx="${x}" cy="${y}" r="3.5" fill="${color}"/>`
+        out += i === 0 ? `<circle cx="${x}" cy="${y}" r="4.5" fill="var(--panel)" stroke="${color}" stroke-width="2"/>` : `<circle cx="${x}" cy="${y}" r="3.5" fill="${color}"/>`
       })
     })
     svg.innerHTML = out
@@ -213,6 +218,7 @@ function select(id, options = {}) {
   if (isNew) {
     state.detail = null
     state.detailCount = 8
+    if (options.agent === undefined) { state.agent = null; state.agentDetail = null }
     state.catchup = { since: session.lastReadAt, items: session.catchup || [], isRead: false }
     state.focusSig = ''
     buildFocus()
@@ -220,13 +226,14 @@ function select(id, options = {}) {
     loadDetail()
     post('/api/read', { sessionId: id }).catch(() => undefined)
   }
+  if (options.agent && state.agent !== options.agent) openAgent(options.agent)
   renderOverview()
   renderFocus()
   if (options.scroll) document.querySelector(`.srow[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: 'nearest' })
 }
 
 function buildFocus() {
-  $('focus').innerHTML = `<div class="fh" id="f-head"></div><div class="fbody" id="f-body"><div id="f-catch"></div><div id="f-ask"></div><div id="f-brief"></div><div id="f-ctx"></div><div id="f-agents"></div><div class="chat" id="f-chat"></div></div>
+  $('focus').innerHTML = `<div class="fh" id="f-head"></div><div class="fbody" id="f-body"><div id="f-catch"></div><div id="f-ask"></div><div id="f-brief"></div><div id="f-ctx"></div><div id="f-agents"></div><div id="f-agentlog"></div><div class="chat" id="f-chat"></div></div>
     <div class="composer"><textarea id="composer" placeholder="Write to this session. It arrives as your own input."></textarea><div class="row" id="composer-row"><span id="composer-hint">Ctrl+Enter sends</span><button type="button" class="btn primary" id="send">Send</button></div></div>`
 }
 
@@ -329,7 +336,7 @@ function renderBrief(s) {
 
 function renderAgents(s) {
   const list = s.agents || []
-  const html = list.length ? `<h3>Agents</h3><div class="agents">${list.slice(0, 8).map(a => `<div><span class="chip m${a.state === 'done' ? ' done' : ''}" style="--mc:${modelColor(a.model)}">${esc(modelKey(a.model) || '?')}</span><b>${esc(a.type || 'agent')}</b><span class="mono">${esc(a.state)} ${esc(ago(a.updatedAt))}</span><span>${esc(a.description || a.lastText || '')}</span></div>`).join('')}</div>` : ''
+  const html = list.length ? `<h3>Agents</h3><div class="agents">${list.slice(0, 8).map(a => `<button type="button" data-agent="${esc(a.id)}" aria-pressed="${state.agent === a.id}" title="Show what this agent does"><span class="chip m${a.state === 'done' ? ' done' : ''}" style="--mc:${modelColor(a.model)}">${esc(modelKey(a.model) || '?')}</span><b>${esc(a.type || 'agent')}</b><span class="mono">${esc(a.state)} ${esc(ago(a.updatedAt))}</span><span>${esc(a.description || a.lastText || '')}</span></button>`).join('')}</div>` : ''
   if ($('f-agents').dataset.sig !== html) { $('f-agents').innerHTML = html; $('f-agents').dataset.sig = html }
 }
 
@@ -361,6 +368,65 @@ async function loadDetail(force = false) {
   } catch (error) {
     toast(`Could not load the conversation: ${error.message}`, true)
   }
+}
+
+/* agent live view */
+
+function openAgent(id) {
+  if (state.agent === id) return closeAgent()
+  state.agent = id
+  state.agentDetail = null
+  renderFocus()
+  renderAgentLog()
+  loadAgent()
+}
+
+function closeAgent() {
+  state.agent = null
+  state.agentDetail = null
+  renderFocus()
+  renderAgentLog()
+}
+
+async function loadAgent() {
+  const id = state.selected
+  const agent = state.agent
+  if (!id || !agent) return
+  try {
+    const value = await api(`/api/agent?id=${encodeURIComponent(id)}&agent=${encodeURIComponent(agent)}&n=60`)
+    if (state.selected !== id || state.agent !== agent) return
+    state.agentDetail = value
+  } catch (error) {
+    state.agentDetail = { error: error.message }
+  }
+  renderAgentLog()
+}
+
+function renderAgentLog() {
+  const el = $('f-agentlog')
+  if (!el) return
+  const a = state.agentDetail
+  let html = ''
+  if (state.agent && !a) html = '<div class="agentlog"><span class="hint">Loading the agent…</span></div>'
+  else if (a?.error) html = `<div class="agentlog"><span class="hint">Agent not readable: ${esc(a.error)}</span></div>`
+  else if (a) {
+    const steps = a.steps.map(st => st.kind === 'tool'
+      ? `<div class="st tool"><b>${esc(st.name)}</b><span class="mono">${esc(st.text)}</span></div>`
+      : st.kind === 'result'
+        ? `<div class="st res${st.isError ? ' err' : ''}"><span class="mono">${esc(st.text || '(empty)')}</span></div>`
+        : `<div class="st txt">${esc(st.text)}</div>`).join('')
+    const live = a.state === 'running' ? '<span class="dot st-run"></span>' : ''
+    html = `<div class="agentlog"><div class="ah">${live}<span class="chip m${a.state === 'done' ? ' done' : ''}" style="--mc:${modelColor(a.model)}">${esc(prettyModel(a.model) || modelKey(a.model) || '?')}${a.effort ? ` · ${esc(a.effort)}` : ''}</span><b>${esc(a.description || a.type || 'agent')}</b><span class="mono">${esc(a.type || '')} · ${esc(a.state)} ${esc(ago(a.updatedAt))}</span><button type="button" class="btn sm" data-agent-close>Close</button></div>
+      ${a.prompt ? `<details><summary>Task</summary><div class="st txt">${esc(a.prompt)}</div></details>` : ''}
+      <div class="steps" id="agent-steps">${steps || '<span class="hint">No steps yet.</span>'}</div></div>`
+  }
+  if (el.dataset.sig === html) return
+  const box = $('agent-steps')
+  const isAtEnd = !box || box.scrollHeight - box.scrollTop - box.clientHeight < 24
+  el.innerHTML = html
+  el.dataset.sig = html
+  const next = $('agent-steps')
+  if (next && isAtEnd) next.scrollTop = next.scrollHeight
 }
 
 /* answering */
@@ -517,8 +583,10 @@ async function focusAct(act) {
   if (act === 'open') {
     if (s.kind !== 'interactive') return focusAct('attach')
     try {
-      const result = await post('/api/focus', {})
-      toast(result.ok ? `Terminal in front: the session is the tab "${s.name}"` : `Switch to the terminal tab "${s.name}"`)
+      const result = await post('/api/focus', { sessionId: s.sessionId })
+      if (result.isTab) toast(`Switched to "${titleOf(s)}" in the terminal`)
+      else if (result.reason === 'permission') toast('Allow Lookout to control your terminal: System Settings, Privacy & Security, Automation', true)
+      else toast(result.ok ? `Terminal in front: the session is the tab "${s.name}"` : `Switch to the terminal tab "${s.name}"`)
     } catch {
       toast(`Switch to the terminal tab "${s.name}"`)
     }

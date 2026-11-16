@@ -3,7 +3,7 @@ const token = new URLSearchParams(location.search).get('token') || ''
 const state = {
   tab: 'overview',
   sessions: [], repos: [], leases: [], budget: { limits: [], burn: [] }, messaging: { isAvailable: false },
-  now: Date.now(), selected: null, detail: null, detailCount: 8,
+  now: Date.now(), selected: null, detail: null, detailCount: 8, agent: null, agentDetail: null,
   drafts: new Map(), sending: new Set(), done: new Map(),
   look: null, digest: null,
   ledger: null, ledgerQuery: '', time: null, timeDays: 7, openItems: new Set(), settings: null,

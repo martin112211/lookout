@@ -380,9 +380,8 @@ export function sessionAgents(transcript) {
       continue
     }
     const meta = readJson(join(dir, name), {})
-    const isFinished = Boolean(meta.finished)
-    if (isFinished && now - mtime > AGENT_RECENT_MS) continue
-    const state = isFinished ? 'done' : now - mtime > AGENT_STALE_MS ? 'stalled' : 'running'
+    if (meta.finished && now - mtime > AGENT_RECENT_MS) continue
+    const state = agentState(meta, mtime, now)
     agents.push({
       id: name.replace(/^agent-|\.meta\.json$/g, ''),
       type: meta.agentType,
@@ -397,6 +396,64 @@ export function sessionAgents(transcript) {
   }
   agents.sort((a, b) => (a.state === 'done') - (b.state === 'done') || b.updatedAt - a.updatedAt)
   return agents.slice(0, 16)
+}
+
+function agentState(meta, mtime, now) {
+  return meta.finished ? 'done' : now - mtime > AGENT_STALE_MS ? 'stalled' : 'running'
+}
+
+function resultText(content) {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return content.filter(block => block?.type === 'text').map(block => block.text).join('\n')
+}
+
+/** One subagent's run as steps (its prompt, what it said, which tools it called and what came back), for the live view. */
+export function agentDetail(sessionId, agentId, count = 40) {
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(String(agentId))) return undefined
+  const reg = findRegistration(sessionId)
+  const transcript = findTranscript(reg?.cwd ?? '', sessionId)
+  if (!transcript) return undefined
+  const dir = join(transcript.replace(/\.jsonl$/, ''), 'subagents')
+  const log = join(dir, `agent-${agentId}.jsonl`)
+  if (!existsSync(log)) return undefined
+  const meta = readJson(join(dir, `agent-${agentId}.meta.json`), {})
+  const { mtimeMs } = statSync(log)
+  const { lines } = readTail(log, AGENT_TAIL_BYTES)
+  const steps = []
+  let prompt
+  for (const entry of parseLines(lines)) {
+    const content = entry.message?.content
+    if (entry.type === 'user') {
+      if (typeof content === 'string') {
+        prompt ??= cut(content, 1200)
+        continue
+      }
+      for (const block of Array.isArray(content) ? content : []) {
+        if (block?.type === 'tool_result') steps.push({ kind: 'result', at: entry.timestamp, text: cut(resultText(block.content), 300), isError: Boolean(block.is_error) })
+        else if (block?.type === 'text' && block.text?.trim()) prompt ??= cut(block.text, 1200)
+      }
+      continue
+    }
+    if (entry.type !== 'assistant') continue
+    for (const block of Array.isArray(content) ? content : []) {
+      if (block?.type === 'tool_use') steps.push({ kind: 'tool', at: entry.timestamp, name: block.name, text: toolSummary({ input: block.input }) })
+      else if (block?.type === 'text' && block.text?.trim()) steps.push({ kind: 'text', at: entry.timestamp, text: cut(block.text, 2000) })
+    }
+  }
+  return {
+    sessionId,
+    agentId,
+    type: meta.agentType,
+    description: meta.description,
+    model: meta.pickedEffortModel ?? meta.model,
+    effort: meta.effort,
+    isBackground: meta.requestShape === 'background',
+    state: agentState(meta, mtimeMs, Date.now()),
+    updatedAt: mtimeMs,
+    prompt,
+    steps: steps.slice(-count),
+  }
 }
 
 function questionsOf(input) {

@@ -2,14 +2,17 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 import type { On } from './on'
 
-import type { HubDetail, HubLiveItem, HubRecap, HubSession, Snapshot } from '../types'
-import { PANE, age, collect, fit, forkName, label, loadDetail, openAskPane, openBrowser, openSettingsPane, openTab, pickAnswer, select } from './hub'
+import type { HubAgentDetail, HubDetail, HubLiveItem, HubRecap, HubSession, Snapshot } from '../types'
+import { PANE, age, collect, fit, forkName, label, loadAgent, loadDetail, openAskPane, openBrowser, openSettingsPane, openTab, pickAnswer, select } from './hub'
+import { platform } from './config'
+import { focusSessionArgv, parseProcessInfo, processInfoArgv } from './terminal'
 import { loadRecap, recapInput } from './recap'
 
 const sessions = atom({ plugin: 'lookout', key: 'sessions' } as const, [] as HubSession[], { shape: 'sessions-1' })
 const refreshedAt = atom({ plugin: 'lookout', key: 'refreshedAt' } as const, 0)
 const selected = atom({ plugin: 'lookout', key: 'selected' } as const, null as string | null)
 const detail = atom({ plugin: 'lookout', key: 'detail' } as const, null as HubDetail | null, { shape: 'detail-1' })
+const agentView = atom({ plugin: 'lookout', key: 'agentView' } as const, null as HubAgentDetail | null, { shape: 'agent-1' })
 const notice = atom({ plugin: 'lookout', key: 'notice' } as const, null as string | null)
 const selfId = atom({ plugin: 'lookout', key: 'selfId' } as const, null as string | null)
 const snapshot = atom({ plugin: 'lookout', key: 'statusSnapshot' } as const, null as Snapshot | null)
@@ -48,6 +51,12 @@ function lineOf(session: HubSession): string {
   if (session.status === 'busy' && session.currentTool) return `${session.currentTool.name} ${session.currentTool.summary ?? ''}`
   if (session.brief?.next) return `Next: ${session.brief.next}`
   return session.lastAssistant ?? ''
+}
+
+/** A dim section heading with a line to the box edge, so the parts of the session box stand apart. */
+function rule(title: string, width: number): string {
+  const head = `── ${title} `
+  return head.length >= width ? fit(head, width) : `${head}${'─'.repeat(width - head.length)}`
 }
 
 function laneOf(session: HubSession): string {
@@ -125,7 +134,40 @@ async function openInTerminal($: EngineInterface, session: HubSession): Promise<
     await openTab($, { title: session.name, command: ['claude', 'attach', session.sessionId] }, 'Attach')
     return
   }
-  await update($, notice, () => `Switch to the terminal tab "${session.name}": a running interactive session cannot be opened twice.`)
+  try {
+    const os = await platform($)
+    if (os === 'mac' && session.pid) {
+      const ps = await $.process.run(processInfoArgv(session.pid), { timeoutMs: 5_000 })
+      const info = parseProcessInfo(ps.stdout)
+      const others = (await read($, sessions)).filter(one => one.sessionId !== session.sessionId && one.cwd === session.cwd).map(one => one.title ?? one.name)
+      const terminal = info.terminal ?? (await $.env.get('TERM_PROGRAM'))
+      const argv = focusSessionArgv(os, terminal, { titles: [session.title, session.name], others, cwd: session.cwd, tty: info.tty })
+      if (argv) {
+        const result = await $.process.run(argv, { timeoutMs: 8_000 })
+        if (result.stdout.trim() === 'ok') {
+          await update($, notice, () => `Switched to "${label(session)}".`)
+          return
+        }
+        if (/-1743|not allowed|Not authorized/i.test(result.stderr)) {
+          await update($, notice, () => 'Allow Claude Code to control your terminal: System Settings, Privacy & Security, Automation.')
+          return
+        }
+      }
+    }
+  } catch {}
+  await update($, notice, () => `Switch to the terminal tab "${session.name}": its tab was not found.`)
+}
+
+async function cycleAgent($: EngineInterface, session: HubSession): Promise<void> {
+  const list = session.agents ?? []
+  if (!list.length) {
+    await update($, notice, () => 'This session runs no agents.')
+    return
+  }
+  const open = await read($, agentView)
+  const at = open?.sessionId === session.sessionId ? list.findIndex(one => one.id === open.agentId) : -1
+  const next = at + 1 < list.length ? list[at + 1] : undefined
+  await loadAgent($, session.sessionId, next?.id ?? null)
 }
 
 export const registerLookoutPane = (on: On): void => {
@@ -183,6 +225,7 @@ export const registerLookoutPane = (on: On): void => {
     const me = await read($, selfId)
     const chosen = await read($, selected)
     const shown = await read($, detail)
+    const agent = await read($, agentView)
     const message = await read($, notice)
     const stamp = await read($, refreshedAt)
     const drafts = await read($, paneDraft)
@@ -198,6 +241,7 @@ export const registerLookoutPane = (on: On): void => {
     const item = current ? openItem(current) : null
     const question = item && item.kind === 'question' && 'id' in item && current?.sessionId !== me ? item : null
     const ctx = current ? contextPercent(current, now) : null
+    const inner = Math.max(8, columns - 4)
 
     return (
       <Box flexDirection="column">
@@ -225,7 +269,10 @@ export const registerLookoutPane = (on: On): void => {
                   const unread = session.unread && session.sessionId !== chosen ? ` (${session.unread})` : ''
                   const tag = session.workItem ? ` #${session.workItem}` : ''
                   const lane = laneOf(session)
-                  const head = `${label(session)}${tag}${unread}${isMe ? ' · this session' : ''}`
+                  const agentList = session.agents ?? []
+                  const running = agentList.filter(one => one.state === 'running').length
+                  const agents = agentList.length ? ` · ${running ? `${running} agent${running === 1 ? '' : 's'} running` : `${agentList.length} agent${agentList.length === 1 ? '' : 's'}`}` : ''
+                  const head = `${label(session)}${tag}${unread}${agents}${isMe ? ' · this session' : ''}`
                   const tail = ` ${age(session.statusUpdatedAt, now)}`
                   return (
                     <Box key={`row-${session.sessionId}`} flexDirection="column">
@@ -252,7 +299,7 @@ export const registerLookoutPane = (on: On): void => {
             </Text>
             {(current.catchup ?? []).length > 0 && (
               <Box flexDirection="column" marginTop={1}>
-                <Text dimColor>{`Since you were last here${current.lastReadAt ? ` (${age(current.lastReadAt, now)} ago)` : ''}`}</Text>
+                <Text dimColor>{rule(`Since you were last here${current.lastReadAt ? ` (${age(current.lastReadAt, now)} ago)` : ''}`, inner)}</Text>
                 {(current.catchup ?? []).slice(-6).map((one, index) => (
                   <Text key={`c-${index}`} wrap="truncate-end">
                     <Text color={one.g === '?' || one.g === '!' ? 'warning' : 'subtle'}>{`${one.g} `}</Text>
@@ -292,6 +339,7 @@ export const registerLookoutPane = (on: On): void => {
             )}
             {current.brief && (
               <Box flexDirection="column" marginTop={1}>
+                <Text dimColor>{rule('Brief', inner)}</Text>
                 {current.brief.goal && <Text wrap="wrap">{`Goal: ${current.brief.goal}`}</Text>}
                 {(current.brief.decided ?? []).slice(-3).map((one, index) => (
                   <Text key={`d-${index}`} dimColor wrap="wrap">{`· ${one}`}</Text>
@@ -300,15 +348,45 @@ export const registerLookoutPane = (on: On): void => {
                 {current.brief.blocked && <Text color="warning" wrap="wrap">{`Waits for: ${current.brief.blocked}`}</Text>}
               </Box>
             )}
-            {!shown && <Text dimColor>Loading last messages…</Text>}
-            {shown?.messages.slice(-3).map((one, index) => (
-              <Box key={`msg-${index}`} flexDirection="column" marginTop={1}>
-                <Text color={one.role === 'user' ? 'suggestion' : 'text'} bold>
-                  {one.role === 'user' ? 'You' : 'Claude'}
-                </Text>
-                <Text wrap="wrap">{one.text.length > 600 ? `${one.text.slice(0, 599)}…` : one.text}</Text>
+            {(current.agents ?? []).length > 0 && (
+              <Box flexDirection="column" marginTop={1}>
+                <Text dimColor>{rule('Agents · a: next, shows what it does', inner)}</Text>
+                {(current.agents ?? []).slice(0, 6).map(one => {
+                  const isOpen = agent?.agentId === one.id
+                  return (
+                    <Button key={`agent-${one.id}`} plain onPress={() => void loadAgent($, current.sessionId, isOpen ? null : one.id)}>
+                      <Text color={one.state === 'running' ? 'claude' : 'subtle'}>{one.state === 'running' ? '● ' : one.state === 'stalled' ? '? ' : '✓ '}</Text>
+                      <Text bold={isOpen}>{fit(`${one.type ?? 'agent'} · ${one.description ?? ''}`, Math.max(8, columns - 18))}</Text>
+                      <Text dimColor>{` ${(one.model ?? '').replace(/^claude-/, '')} ${age(one.updatedAt, now)}`}</Text>
+                    </Button>
+                  )
+                })}
               </Box>
-            ))}
+            )}
+            {agent && agent.sessionId === current.sessionId && (
+              <Box flexDirection="column" marginTop={1} borderStyle="single" paddingX={1}>
+                <Text bold>{fit(`${agent.description ?? agent.type ?? 'agent'} · ${agent.state}`, columns - 8)}</Text>
+                {agent.steps.length === 0 && <Text dimColor>No steps yet.</Text>}
+                {agent.steps.slice(-10).map((step, index) => (
+                  <Text key={`step-${index}`} wrap="truncate-end" color={step.isError ? 'error' : undefined} dimColor={step.kind === 'result'}>
+                    {step.kind === 'tool' ? `› ${step.name} ${step.text}` : step.kind === 'result' ? `  ${step.text}` : step.text}
+                  </Text>
+                ))}
+              </Box>
+            )}
+            <Box flexDirection="column" marginTop={1}>
+              <Text dimColor>{rule('Conversation · last messages', inner)}</Text>
+              {!shown && <Text dimColor>Loading last messages…</Text>}
+              {shown?.messages.length === 0 && <Text dimColor>No messages yet.</Text>}
+              {shown?.messages.slice(-3).map((one, index) => (
+                <Box key={`msg-${index}`} flexDirection="column" marginTop={index === 0 ? 0 : 1}>
+                  <Text color={one.role === 'user' ? 'suggestion' : 'text'} bold>
+                    {`${one.role === 'user' ? 'You' : 'Claude'}${Number.isFinite(Date.parse(one.at ?? '')) ? ` · ${age(Date.parse(one.at ?? ''), now)} ago` : ''}`}
+                  </Text>
+                  <Text wrap="wrap">{one.text.length > 600 ? `${one.text.slice(0, 599)}…` : one.text}</Text>
+                </Box>
+              ))}
+            </Box>
             {current.sessionId !== me && (
               <Box marginTop={1}>
                 <Input
@@ -329,6 +407,7 @@ export const registerLookoutPane = (on: On): void => {
             )}
             <Box flexDirection="row" gap={1} marginTop={1} flexWrap="wrap">
               <Button key={`open-${current.sessionId}`} label="Open" hotkey="o" onPress={() => void openInTerminal($, current)} />
+              {(current.agents ?? []).length > 0 && <Button key={`agents-${current.sessionId}`} label="Agent" hotkey="a" onPress={() => void cycleAgent($, current)} />}
               <Button
                 key={`fork-${current.sessionId}`}
                 label="Fork"

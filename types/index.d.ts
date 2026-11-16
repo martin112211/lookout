@@ -78,6 +78,22 @@ export type HubMessage = { role: 'user' | 'assistant'; at?: string; text: string
 
 export type HubDetail = { sessionId: string; messages: HubMessage[] }
 
+export type HubAgentStep = { kind: 'tool' | 'result' | 'text'; at?: string; name?: string; text: string; isError?: boolean }
+
+export type HubAgentDetail = {
+  sessionId: string
+  agentId: string
+  type?: string
+  description?: string
+  model?: string
+  effort?: string
+  isBackground?: boolean
+  state: HubAgent['state']
+  updatedAt: number
+  prompt?: string
+  steps: HubAgentStep[]
+}
+
 export type GitInfo = { branch: string; dirty: boolean; ahead: number; behind: number }
 
 export type Limit = { kind: string; percent: number; resetsAt?: string }
@@ -115,6 +131,7 @@ declare module 'claude-code' {
       refreshedAt: number
       selected: string | null
       detail: Shaped<HubDetail | null>
+      agentView: Shaped<HubAgentDetail | null>
       notice: string | null
       selfId: string | null
       askDraft: Record<string, Record<string, string>>

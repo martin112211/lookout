@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { isSameDecision } from '../hooks/decisions'
-import { browserArgv, tabArgv } from '../hooks/terminal'
+import { browserArgv, focusSessionArgv, parseProcessInfo, tabArgv } from '../hooks/terminal'
 
 const FORK = { cwd: '/Users/me/repo it', title: 'Fork: x', command: ['claude', '--resume', 'abc', '--fork-session'] }
 
@@ -16,6 +16,23 @@ describe('platform', () => {
     const script = tabArgv('mac', 'Apple_Terminal', { cwd: "/tmp/it's", title: 't', command: ['claude', 'attach', 'abc'] })
     expect(script[0]).toBe('osascript')
     expect(script[2]).toBe(`tell application "Terminal" to do script "cd '/tmp/it'\\\\''s' && 'claude' 'attach' 'abc'"`)
+  })
+
+  test('a session process gives its terminal device and terminal app', async () => {
+    expect(parseProcessInfo('ttys003  claude --resume x TERM=xterm TERM_PROGRAM=ghostty HOME=/Users/me\n')).toEqual({ tty: 'ttys003', terminal: 'ghostty' })
+    expect(parseProcessInfo('??       claude')).toEqual({ tty: undefined, terminal: undefined })
+  })
+
+  test('Open finds the session tab: Ghostty by title and folder, Terminal by device, nothing off macOS', async () => {
+    const target = { titles: ['Fix "the" login', undefined, 'ab'], others: ['Other work'], cwd: '/Users/me/repo', tty: 'ttys004' }
+    const ghostty = focusSessionArgv('mac', 'ghostty', target)?.[2] ?? ''
+    expect(ghostty).toContain('set wanted to {"Fix \\"the\\" login"}')
+    expect(ghostty).toContain('set others to {"Other work"}')
+    expect(ghostty).toContain('every terminal whose working directory is "/Users/me/repo"')
+    expect(focusSessionArgv('mac', 'Apple_Terminal', target)?.[2]).toContain('if tty of t is "/dev/ttys004"')
+    expect(focusSessionArgv('mac', 'Apple_Terminal', { ...target, tty: undefined })).toBeNull()
+    expect(focusSessionArgv('mac', 'WezTerm', target)).toBeNull()
+    expect(focusSessionArgv('windows', 'ghostty', target)).toBeNull()
   })
 
   test('the browser opener follows the platform', async () => {

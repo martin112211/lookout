@@ -1,4 +1,4 @@
-import { collectSessions, collisions, hubDir, migrateLegacyDir, readBrief, sessionDetail } from './hub-data.mjs'
+import { agentDetail, collectSessions, collisions, hubDir, migrateLegacyDir, readBrief, sessionDetail } from './hub-data.mjs'
 import { markRead, publicSession, withCatchup } from './catchup.mjs'
 
 const args = process.argv.slice(2)
@@ -26,7 +26,9 @@ const result =
     ? { isMigrated: migrateLegacyDir() }
     : args[0] === '--detail'
       ? sessionDetail(args[1], Number(args[2] ?? 10))
-      : args[0] === '--brief-input'
+      : args[0] === '--agent'
+        ? (agentDetail(args[1], args[2], Number(args[3] ?? 40)) ?? null)
+        : args[0] === '--brief-input'
         ? briefInput(args[1])
         : args[0] === '--recap'
           ? recap(args[1])

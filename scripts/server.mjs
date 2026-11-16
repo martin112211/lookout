@@ -2,10 +2,10 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-import { collectSessions, collisions, findRegistration, forkName, hubDir, ledger, readBrief, sessionDetail, sessionTitle } from './hub-data.mjs'
+import { agentDetail, collectSessions, collisions, findRegistration, forkName, hubDir, ledger, readBrief, sessionDetail, sessionTitle } from './hub-data.mjs'
 import { dayKey, scanFile, sessionIdOf, titleOf, transcriptsSince } from './scan.mjs'
 import { DEFAULT_CONFIG, FEATURE_LABELS, MODEL_CHOICES, PRESETS, draftRoute, routeAgent, sanitizeConfig } from '../hooks/settings.ts'
-import { focusArgv, tabArgv } from '../hooks/terminal.ts'
+import { focusArgv, focusSessionArgv, parseProcessInfo, processInfoArgv, tabArgv } from '../hooks/terminal.ts'
 import { digest, loadReads, markRead, publicSession, withCatchup } from './catchup.mjs'
 import { spawnSync } from 'node:child_process'
 
@@ -396,11 +396,28 @@ async function handleApi(request, url) {
     return json({ diff: (result.stdout || '').slice(0, 200_000), files: [...new Set(files)] })
   }
   if (path === '/api/focus' && request.method === 'POST') {
+    const { sessionId } = await body(request)
+    const reg = typeof sessionId === 'string' ? findRegistration(sessionId) : undefined
+    if (reg?.pid && OS === 'mac') {
+      const ps = spawnSync(processInfoArgv(reg.pid)[0], processInfoArgv(reg.pid).slice(1), { encoding: 'utf8', timeout: 3000 })
+      const info = parseProcessInfo(ps.stdout || '')
+      const others = (lastSessions ?? []).filter(one => one.sessionId !== reg.sessionId && one.cwd === reg.cwd).map(one => one.title ?? one.name)
+      const argv = focusSessionArgv(OS, info.terminal ?? process.env.TERM_PROGRAM, { titles: [sessionTitle(reg.sessionId), reg.name], others, cwd: reg.cwd, tty: info.tty })
+      if (argv) {
+        const result = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', timeout: 8000 })
+        if ((result.stdout || '').trim() === 'ok') return json({ ok: true, isTab: true })
+        if (/-1743|not allowed|Not authorized/i.test(result.stderr || '')) return json({ ok: false, reason: 'permission' })
+      }
+    }
     const argv = focusArgv(OS, process.env.TERM_PROGRAM)
     if (!argv) return json({ ok: false, reason: 'no known terminal to bring forward' })
     const child = Bun.spawn(argv, { stdout: 'ignore', stderr: 'ignore' })
     child.unref()
-    return json({ ok: true })
+    return json({ ok: true, isTab: false })
+  }
+  if (path === '/api/agent' && request.method === 'GET') {
+    const value = agentDetail(url.searchParams.get('id') ?? '', url.searchParams.get('agent') ?? '', Math.min(120, Number(url.searchParams.get('n') ?? 40)))
+    return value ? json(value) : json({ error: 'agent not found' }, 404)
   }
   if (path.startsWith('/api/send/') && request.method === 'GET') {
     const item = queue.get(path.slice('/api/send/'.length))

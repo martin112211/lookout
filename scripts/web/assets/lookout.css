@@ -85,7 +85,7 @@ h3 { font-size: 11.5px; margin: 0; text-transform: uppercase; letter-spacing: 0.
 :root[data-look="editorial"] .overview { gap: 26px; padding: 18px 20px; }
 .rc { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; min-width: 0; }
 :root[data-look="editorial"] .rc { border: 0; border-top: 2px solid var(--ink); border-radius: 0; background: transparent; }
-.rh { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.rh { display: flex; gap: 10px; align-items: baseline; padding: 10px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 :root[data-look="warm"] .rh { background: var(--raised); }
 :root[data-look="editorial"] .rh { padding-inline: 0; }
 .rh b { font-size: 14px; font-family: var(--display); }
@@ -99,9 +99,9 @@ h3 { font-size: 11.5px; margin: 0; text-transform: uppercase; letter-spacing: 0.
 .rails { position: relative; }
 .rails svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .rows { display: flex; flex-direction: column; min-width: 0; }
-.brow { padding: 8px 12px 2px 2px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+.brow { padding: 8px 12px 2px 10px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
 .brow .c { color: var(--faint); }
-.srow { padding: 7px 12px 9px 2px; display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 4px 14px; cursor: pointer; border-radius: var(--r-md); margin: 0 6px 2px 0; position: relative; }
+.srow { padding: 7px 12px 9px 10px; display: grid; grid-template-columns: minmax(0, 1fr) 132px; gap: 4px 14px; cursor: pointer; border-radius: var(--r-md); margin: 0 6px 2px 0; position: relative; }
 .srow:hover { background: var(--raised); }
 .srow.sel { background: var(--raised); box-shadow: inset 0 0 0 1px var(--line); }
 .srow.wait { background: var(--attn-bg); }
@@ -182,8 +182,23 @@ code.cmd { font-family: var(--mono); font-size: 12.5px; background: var(--raised
 .ctxbar i { flex: 1; height: 5px; border-radius: var(--r-sm); background: var(--raised); position: relative; overflow: hidden; max-width: 160px; min-width: 60px; }
 .ctxbar i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); background: var(--mc, var(--run)); }
 .agents { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
-.agents div { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
-.agents span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.agents button { display: flex; gap: 8px; align-items: baseline; min-width: 0; font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-sm); padding: 3px 6px; margin: 0 -6px; cursor: pointer; }
+.agents button:hover, .agents button[aria-pressed="true"] { background: var(--raised); }
+.agents button span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.srow .chip[data-agent-open] { cursor: pointer; }
+.agentlog { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px 10px; font-size: 12.5px; }
+.agentlog .ah { display: flex; gap: 8px; align-items: center; min-width: 0; flex-wrap: wrap; }
+.agentlog .ah b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.agentlog .ah .mono { color: var(--muted); font-size: 11px; }
+.agentlog summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.agentlog .steps { display: flex; flex-direction: column; gap: 3px; max-height: 340px; overflow: auto; }
+.agentlog .st { min-width: 0; overflow-wrap: anywhere; }
+.agentlog .st.tool { display: flex; gap: 8px; align-items: baseline; }
+.agentlog .st.tool b { flex-shrink: 0; }
+.agentlog .st.tool .mono { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.agentlog .st.res { padding-left: 14px; color: var(--faint); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agentlog .st.res.err { color: var(--err); }
+.agentlog .st.txt { white-space: pre-wrap; line-height: 1.45; }
 .chat { display: flex; flex-direction: column; gap: 8px; }
 .chat .older { font-size: 12px; color: var(--muted); align-self: center; border: 0; background: transparent; cursor: pointer; text-decoration: underline; }
 .msg { max-width: 92%; padding: 7px 10px; border-radius: var(--r-md); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
