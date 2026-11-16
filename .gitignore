@@ -1,0 +1,8 @@
+.claude-plugin/types/
+node_modules/
+*.log
+
+# Local working notes, not part of the plugin
+HANDOVER.md
+docs/design/
+.DS_Store

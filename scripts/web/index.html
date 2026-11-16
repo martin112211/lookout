@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en" data-look="calm" data-mode="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lookout</title>
+<link rel="stylesheet" href="/assets/lookout.css">
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <span class="name">Lookout</span>
+    <span class="tabs" id="tabs" role="tablist">
+      <button type="button" data-tab="overview" aria-pressed="true">Overview</button>
+      <button type="button" data-tab="decisions" aria-pressed="false">Decisions</button>
+      <button type="button" data-tab="time" aria-pressed="false">Time</button>
+      <button type="button" data-tab="settings" aria-pressed="false">Settings</button>
+    </span>
+    <span class="right">
+      <span id="limits"></span>
+      <span class="live" id="live"><span class="dot st-done"></span><span class="mono" id="live-text">connecting</span></span>
+      <button type="button" class="icon-btn" id="notify" aria-pressed="false" title="Browser notification when a session needs you or finishes">Notify</button>
+    </span>
+  </div>
+  <div class="offline" id="offline">The Lookout server is not answering. It runs from a Claude Code session with the lookout mod: type /lookout-web there.</div>
+
+  <section id="tab-overview">
+    <div class="digest">
+      <div class="need"><b id="need-n">0</b><span id="need-sub">need you</span></div>
+      <div class="since"><span class="h" id="since-h">Since your last look</span><ul id="since"></ul></div>
+      <button class="nextbtn" type="button" id="next">Next open item <span class="kbd">n</span></button>
+    </div>
+    <div class="main">
+      <div class="overview" id="overview"></div>
+      <aside class="focus" id="focus" aria-live="polite"></aside>
+    </div>
+    <div class="keys"><span><span class="kbd">j</span> <span class="kbd">k</span> select</span><span><span class="kbd">n</span> next open item</span><span><span class="kbd">1</span>-<span class="kbd">9</span> answer</span><span><span class="kbd">r</span> write</span><span><span class="kbd">o</span> open in terminal</span><span><span class="kbd">e</span> mark read</span><span><span class="kbd">?</span> show diff</span></div>
+  </section>
+  <section id="tab-decisions" class="page" hidden></section>
+  <section id="tab-time" class="page" hidden></section>
+  <section id="tab-settings" class="page" hidden></section>
+</div>
+
+<div class="modal" id="handoff" role="dialog" aria-modal="true" aria-labelledby="handoff-title">
+  <div class="box">
+    <h3 id="handoff-title">Hand off to another session</h3>
+    <span class="hint">The other session gets this session's brief, its latest answer and your note as a message.</span>
+    <select class="field" id="handoff-target"></select>
+    <textarea class="field" id="handoff-note" placeholder="Note for the other session (optional)"></textarea>
+    <div class="btnrow"><button type="button" class="btn primary" id="handoff-send">Hand off</button><button type="button" class="btn" id="handoff-cancel">Cancel</button></div>
+  </div>
+</div>
+<div class="modal" id="diff" role="dialog" aria-modal="true" aria-labelledby="diff-title">
+  <div class="box">
+    <div class="panel-head"><h3 id="diff-title">Diff</h3><span class="muted" id="diff-sub"></span><button type="button" class="btn sm" id="diff-close">Close</button></div>
+    <pre id="diff-body"></pre>
+  </div>
+</div>
+<div class="toasts" id="toasts" role="status"></div>
+<script src="/assets/core.js"></script>
+<script src="/assets/overview.js"></script>
+<script src="/assets/tabs.js"></script>
+<script src="/assets/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "lookout",
+  "description": "Lookout: run many Claude Code sessions as one, from the terminal, Claude Desktop and a local web page.",
+  "owner": {
+    "name": "Martin Hoppe"
+  },
+  "plugins": [
+    {
+      "name": "lookout",
+      "source": "./"
+    }
+  ]
+}
