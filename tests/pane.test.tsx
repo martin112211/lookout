@@ -18,6 +18,7 @@ test('the sessions pane draws on the terminal and on desktop', async ($, on) => 
 })
 
 test('without a recap the band above the prompt is left to the others', async ($, on) => {
+  on('clock.now', () => ({ value: 1_800_000_000_000 }))
   on('ui.render', ($, e) => {
     const { Text } = $.ui.resolve(e)
     return <Text>engine band</Text>

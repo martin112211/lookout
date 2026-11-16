@@ -92,6 +92,7 @@ const FEATURE_HELP = {
   gitPane: 'Changed files and recent commits in a pane, opened with /git.',
   skinsColors: 'Uses the colours of the skins mod when it is installed, else the built-in palette.',
   cacheTax: 'Moves the cache-tax status line into the status line when cache-tax is installed.',
+  pinBrief: 'Keeps this session\'s Goal and Next (or what it waits for) above the prompt in every session. Needs the session brief.',
 }
 
 async function loadSettings() {

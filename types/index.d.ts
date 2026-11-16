@@ -140,6 +140,7 @@ declare module 'claude-code' {
       gitSnapshot: GitSnapshot | null
       cacheTaxText: string | null
       recap: HubRecap | null
+      ownBrief: HubBrief | null
       paneDraft: Record<string, string>
     }
   }

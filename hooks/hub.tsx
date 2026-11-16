@@ -25,6 +25,7 @@ export const sessions = atom({ plugin: 'lookout', key: 'sessions' } as const, []
 export const refreshedAt = atom({ plugin: 'lookout', key: 'refreshedAt' } as const, 0)
 export const selected = atom({ plugin: 'lookout', key: 'selected' } as const, null)
 export const detail = atom({ plugin: 'lookout', key: 'detail' } as const, null, { shape: 'detail-1' })
+export const ownBrief = atom({ plugin: 'lookout', key: 'ownBrief' } as const, null as HubBrief | null)
 export const agentView = atom({ plugin: 'lookout', key: 'agentView' } as const, null as HubAgentDetail | null, { shape: 'agent-1' })
 export const notice = atom({ plugin: 'lookout', key: 'notice' } as const, null)
 export const selfId = atom({ plugin: 'lookout', key: 'selfId' } as const, null)
@@ -604,12 +605,24 @@ async function updateBrief($: EngineInterface): Promise<void> {
     const path = await hubFile($, 'briefs', `${me}.json`)
     if (!path) return
     await $.fs.write(path, JSON.stringify(brief))
+    await update($, ownBrief, () => brief)
     const before = new Set(input.previous?.decided ?? [])
     for (const text of decided.filter(one => !before.has(one))) await addLedger($, { kind: 'decision', text })
   } catch {
   } finally {
     briefRunning = false
   }
+}
+
+/** This session's brief from its file, for the line pinned above the prompt after a restart or resume. */
+async function loadOwnBrief($: EngineInterface): Promise<void> {
+  try {
+    const me = await $.session.id()
+    const path = await hubFile($, 'briefs', `${me}.json`)
+    if (!path || !(await $.fs.exists(path))) return
+    const brief = JSON.parse(await $.fs.read(path)) as HubBrief
+    await update($, ownBrief, () => brief)
+  } catch {}
 }
 
 async function briefContext($: EngineInterface): Promise<string | undefined> {
@@ -1107,6 +1120,7 @@ export const registerHub = (on: On): void => {
     await statusStart($)
     await gitStart($)
     await recapStart($)
+    void loadOwnBrief($)
     return started
   })
 

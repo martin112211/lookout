@@ -2,9 +2,9 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 import type { On } from './on'
 
-import type { HubAgentDetail, HubDetail, HubLiveItem, HubRecap, HubSession, Snapshot } from '../types'
+import type { HubAgentDetail, HubBrief, HubDetail, HubLiveItem, HubRecap, HubSession, Snapshot } from '../types'
 import { PANE, age, collect, fit, forkName, label, loadAgent, loadDetail, openAskPane, openBrowser, openSettingsPane, openTab, pickAnswer, select } from './hub'
-import { platform } from './config'
+import { loadConfig, platform } from './config'
 import { focusSessionArgv, parseProcessInfo, processInfoArgv } from './terminal'
 import { loadRecap, recapInput } from './recap'
 
@@ -17,6 +17,7 @@ const notice = atom({ plugin: 'lookout', key: 'notice' } as const, null as strin
 const selfId = atom({ plugin: 'lookout', key: 'selfId' } as const, null as string | null)
 const snapshot = atom({ plugin: 'lookout', key: 'statusSnapshot' } as const, null as Snapshot | null)
 const recap = atom({ plugin: 'lookout', key: 'recap' } as const, null as HubRecap | null)
+const ownBrief = atom({ plugin: 'lookout', key: 'ownBrief' } as const, null as HubBrief | null)
 const paneDraft = atom({ plugin: 'lookout', key: 'paneDraft' } as const, {} as Record<string, string>)
 
 const LANE = '▁▂▃▄▅▆▇█'
@@ -198,12 +199,37 @@ export const registerLookoutPane = (on: On): void => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const value = await read($, recap)
-    if (!value || e.props.hasSurvey) return next(e)
+    const features = (await loadConfig($)).features
+    const brief = features.pinBrief.on && features.brief.on ? await read($, ownBrief) : null
+    const isBrief = Boolean(brief && (brief.goal || brief.next || brief.blocked))
+    if ((!value && !isBrief) || e.props.hasSurvey) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
     const now = await $.clock.now()
+    const pinned = isBrief && brief && (
+      <Box key="pinned-brief" flexDirection="column">
+        {brief.goal && (
+          <Text wrap="truncate-end">
+            <Text dimColor>{'Goal '}</Text>
+            {brief.goal}
+          </Text>
+        )}
+        {brief.blocked ? (
+          <Text wrap="truncate-end" color="warning">{`Waits for you: ${brief.blocked}`}</Text>
+        ) : (
+          brief.next && (
+            <Text wrap="truncate-end">
+              <Text dimColor>{'Next '}</Text>
+              {brief.next}
+            </Text>
+          )
+        )}
+      </Box>
+    )
+    if (!value) return <Box flexDirection="column">{pinned}</Box>
     const shown = value.items.slice(-5)
     return (
       <Box flexDirection="column">
+        {pinned}
         <Box flexDirection="row" gap={1}>
           <Text dimColor>{`Lookout · since your last input${value.since ? ` ${age(value.since, now)} ago` : ''}${value.unread ? ` · ${value.unread} replies` : ''}`}</Text>
           <Button key="recap-hide" label="Hide" plain onPress={() => void update($, recap, () => null)} />

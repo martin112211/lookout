@@ -348,8 +348,10 @@ function scanAgent(path) {
   let lastTool
   let lastText
   let toolCount = 0
+  let model
   for (const entry of parseLines(lines)) {
     if (entry.type !== 'assistant') continue
+    if (entry.message?.model) model = entry.message.model
     for (const block of Array.isArray(entry.message?.content) ? entry.message.content : []) {
       if (block?.type === 'tool_use') {
         toolCount++
@@ -358,7 +360,12 @@ function scanAgent(path) {
       if (block?.type === 'text' && block.text?.trim()) lastText = cut(block.text, 240)
     }
   }
-  return { lastTool, lastText, toolCount }
+  return { lastTool, lastText, toolCount, model }
+}
+
+/** The model an agent ran on: from its own replies; the meta file's `pickedEffortModel` is the parent's, used only to pick effort. */
+function agentModel(ranOn, meta) {
+  return ranOn ?? meta.model ?? meta.pickedEffortModel
 }
 
 export function sessionAgents(transcript) {
@@ -382,16 +389,17 @@ export function sessionAgents(transcript) {
     const meta = readJson(join(dir, name), {})
     if (meta.finished && now - mtime > AGENT_RECENT_MS) continue
     const state = agentState(meta, mtime, now)
+    const activity = agentActivity(log, size)
     agents.push({
       id: name.replace(/^agent-|\.meta\.json$/g, ''),
       type: meta.agentType,
       description: meta.description,
-      model: meta.pickedEffortModel ?? meta.model,
       isBackground: meta.requestShape === 'background',
       state,
       updatedAt: mtime,
       size,
-      ...agentActivity(log, size),
+      ...activity,
+      model: agentModel(activity.model, meta),
     })
   }
   agents.sort((a, b) => (a.state === 'done') - (b.state === 'done') || b.updatedAt - a.updatedAt)
@@ -422,8 +430,10 @@ export function agentDetail(sessionId, agentId, count = 40) {
   const { lines } = readTail(log, AGENT_TAIL_BYTES)
   const steps = []
   let prompt
+  let ranOn
   for (const entry of parseLines(lines)) {
     const content = entry.message?.content
+    if (entry.type === 'assistant' && entry.message?.model) ranOn = entry.message.model
     if (entry.type === 'user') {
       if (typeof content === 'string') {
         prompt ??= cut(content, 1200)
@@ -446,7 +456,7 @@ export function agentDetail(sessionId, agentId, count = 40) {
     agentId,
     type: meta.agentType,
     description: meta.description,
-    model: meta.pickedEffortModel ?? meta.model,
+    model: agentModel(ranOn, meta),
     effort: meta.effort,
     isBackground: meta.requestShape === 'background',
     state: agentState(meta, mtimeMs, Date.now()),

@@ -11,9 +11,11 @@ It works in the terminal, in Claude Desktop and on a local web page, on macOS an
 ## What you get
 
 - **One overview.** Every live session, grouped by repository and branch, with its status, its open question or approval, unread replies, recent activity, running agents and context fill.
+- **See what an agent does.** Click a subagent and follow it live: its task, each tool call and what came back.
+- **Jump to a session.** "Open" brings the session's own terminal tab to the front (macOS: Ghostty, Terminal, iTerm).
 - **Answer from one place.** Pick an option with a number key, type your own answer or write to a session. It arrives as your own input.
 - **Catch-up.** "Since your last look" lists commits, finished agents, compactions and files two sessions share. A recap appears above the prompt when you return to a session.
-- **Session briefs.** Goal, decisions, next step and blocker for every session, written by a small model after each turn and handed back after compaction.
+- **Session briefs.** Goal, decisions, next step and blocker for every session, written by a small model after each turn and handed back after compaction. Optionally pinned above the prompt (Settings: "Brief pinned above the prompt").
 - **Decision log.** Every answered question and decision, searchable, one click to save as memory.
 - **No collisions.** A warning when two sessions edit the same file, and `git commit` and integration tests wait while another session holds them.
 - **Limits.** 5-hour and weekly usage with reset times, and a guard that stops new subagents above a weekly threshold.
@@ -55,7 +57,7 @@ Start a new session afterwards. Lookout begins collecting as soon as one session
 | `/lookout-web` | The web page, served on 127.0.0.1:47821 |
 | `/git` | Changed files with line bars and the recent commit graph |
 
-Keys on the web page: `j` and `k` select, `n` next open item, `1` to `9` answer, `r` write, `o` open in the terminal, `e` mark read, `?` diff. In the pane: `n`, `j`, `k`, `1` to `9`, `o` open, `b` browser.
+Keys on the web page: `j` and `k` select, `n` next open item, `1` to `9` answer, `r` write, `o` open in the terminal, `e` mark read, `?` diff. Click an agent (or its chip on a card) to follow it. In the pane: `n`, `j`, `k`, `1` to `9`, `o` open, `a` next agent, `b` browser.
 
 ## Where it runs
 
@@ -67,7 +69,9 @@ Keys on the web page: `j` and `k` select, `n` next open item, `1` to `9` answer,
 | Settings | `/lookout settings` | `/lookout settings` | Settings tab, all values |
 | Status line, `/git` | yes | yes | |
 
-"Open in terminal" and "Fork" open a new tab: Windows Terminal (`wt`) on Windows, and on macOS a Ghostty window when the session runs in Ghostty, else a Terminal window.
+"Open in terminal" switches to the tab the session already runs in. On macOS this works in Ghostty (1.3 or later, found by tab title or folder), Terminal and iTerm (found by the session's terminal device); the first time, macOS asks you to allow Automation. Elsewhere Lookout tells you which tab to switch to. A background session (`claude --bg`) opens with `claude attach` in a new tab.
+
+"Fork" opens a new tab: Windows Terminal (`wt`) on Windows, and on macOS a Ghostty window when the session runs in Ghostty, else a Terminal window.
 
 The web page has three looks, each light and dark, and works at phone width.
 

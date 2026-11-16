@@ -16,6 +16,12 @@ describe('settings', () => {
     expect(config.orchestrator.rules.length).toBe(DEFAULT_CONFIG.orchestrator.rules.length)
   })
 
+  test('the pinned brief ships off and an old config without it stays off', async () => {
+    expect(DEFAULT_CONFIG.features.pinBrief.on).toBe(false)
+    expect(sanitizeConfig({ features: { brief: { on: true } } }).features.pinBrief.on).toBe(false)
+    expect(sanitizeConfig({ features: { pinBrief: { on: true } } }).features.pinBrief.on).toBe(true)
+  })
+
   test('appearance accepts the three looks and falls back to calm', async () => {
     expect(sanitizeConfig({ appearance: { look: 'warm', mode: 'dark' } }).appearance).toEqual({ look: 'warm', mode: 'dark' })
     expect(sanitizeConfig({ appearance: { look: 'neon', mode: 'dim' } }).appearance).toEqual({ look: 'calm', mode: 'system' })
