@@ -13,7 +13,7 @@ let isChecked = false
 export async function loadRecap($: EngineInterface, isAsked: boolean): Promise<void> {
   try {
     const me = await $.session.id()
-    const run = await $.process.run(['bun', `${$.plugin.root}/scripts/collect.mjs`, '--recap', me], { timeoutMs: 20_000 })
+    const run = await $.process.run(['bun', '--no-install', `${$.plugin.root}/scripts/collect.mjs`, '--recap', me], { timeoutMs: 20_000 })
     if (run.exitCode !== 0) return
     const value = JSON.parse(run.stdout) as Omit<HubRecap, 'isAsked'>
     const items = value.items.filter(item => item.g !== '?' && (item.g !== 'E' || isAsked))

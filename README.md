@@ -146,6 +146,45 @@ What Lookout runs on your machine:
 | `~/.claude/lookout/briefs/`, `usage/`, `touches/`, `pending/`, `leases.json`, `reads.json`, `summary.json`, `titles.json`, `routing.jsonl` | live state, rebuilt automatically | no |
 | `~/.claude/lookout/relay.key`, `server.json` | per-machine key and server token | never |
 
+## What the hooks do
+
+Lookout is a mod: TypeScript hooks in `hooks/` that Claude Code runs in every session. Each hook, what it decides and what it changes:
+
+| Hook | When | What it does |
+|---|---|---|
+| `tool.call` on `AskUserQuestion` | Claude asks you a question | Records the open question in `~/.claude/lookout/pending/` so the page and the pane can show it. With "Answer from Lookout" on, it waits for the terminal dialog and for an answer from the page or pane, whichever comes first; an answer from Lookout is returned in place of the dialog's result, in the same shape. Off: the dialog runs alone. |
+| `tool.call` on `ExitPlanMode` | a plan waits for approval | Records that a plan waits. The call and its result stay unchanged. |
+| `classic.PermissionRequest` | a permission prompt appears | Records the prompt so the page can show it read-only. The decision stays yours, in the terminal. |
+| `tool.call` (every tool) | after each tool call | Refreshes the status line and the git pane. After `Edit`, `Write` and `NotebookEdit` it records the edited file; when another live session edited the same file within the radar window, it adds a one-line note to the tool result for Claude. Input and result are otherwise unchanged. |
+| `tool.call` on `Bash` and `PowerShell` | the command is `git commit` or an integration test run | Waits up to `waitMin` minutes (default 15) while another session holds that lock, then runs the command unchanged, and adds a note when it waited. It never changes or refuses a command. |
+| `agent.spawn` | a subagent is about to start | Budget guard: when your weekly usage is at or above the threshold (default 90 %), it refuses the new subagent with a message asking Claude to report instead. Switch "Budget guard" off to never refuse. |
+| `classic.PreToolUse` | before each tool call | Reads the session's effort level for the orchestrator. Changes nothing. |
+| `tool.call` on `Agent` | Claude starts a subagent | Orchestrator, off by default: may set `model` and `effort` on the Agent call, by the rules under [Orchestrator](#orchestrator). It never changes the prompt, the agent type or any other field, keeps an explicit `model` or `effort` (while "Keep what the Agent call names itself" is on, the default), and leaves forks alone. After the run it logs the outcome and may add one note suggesting a single re-run. |
+| `turn.complete` | a turn ends | Updates the status line and usage file, writes the session brief (a model call, see below) and logs background agents' outcomes. |
+| `classic.SessionStart` | after a compaction | Adds the session brief to the new context. |
+| `session.receive` | another session sends a message | Only a message signed with this machine's Lookout key (`relay.key`, at most 5 minutes old) is submitted as your own prompt; that is how text from the page reaches a session. Every other message passes unchanged. |
+| `prompt.submit` | you send a prompt | Hides the recap band. Your prompt passes unchanged. |
+| `ui.status` | cache-tax sets its status text | With the cache-tax switch on, takes that text into Lookout's status line. |
+| `ui.render` | drawing | Draws the panes (`/lookout`, `/lookout ask`, `/lookout settings`, `/git`), the band above the prompt (pinned brief, recap) and the status line under the prompt, which replaces that line. It never draws the `AskUserQuestion` dialog. |
+| `command.run` | `/lookout`, `/lookout-web`, `/git` | Opens the panes or the web page. |
+| `session.start` | a session starts | Starts the timers (collector every few seconds, usage every minute), moves data once from an old `~/.claude/hub` or `~/.claude/docket` folder, loads the brief. |
+
+### What Lookout puts in prompts
+
+- **Session brief:** a fixed instruction (in `hooks/hub.tsx`), the previous brief and this session's last 16 messages, each cut to 1,500 characters, sent through Claude Code to the brief model (Haiku by default), at most once per turn and per `everySec`.
+- **Routing classifier:** the subagent's description and the first 2,500 characters of its prompt, sent through Claude Code to Haiku, which answers with one tier.
+- **Messages from the page:** the text you type, delivered as your own input to the session you picked. A hand-off adds the source session's brief and latest answer. "Commit" sends the fixed request "Looks good. Commit your changes now: only your own hunks, in the commit style of this repository."
+- **Notes for Claude:** the one-line notes above (shared file, lock wait, re-run) and the budget guard's refusal text.
+
+### What Lookout writes
+
+Only files under `~/.claude/lookout` (see the table above), including `config.json`, which changes only when you change a setting. It never writes to your repositories, to Claude Code's settings, to `CLAUDE.md` or to the session files it reads.
+
+### Hosts and values it reads
+
+- The hooks call only `http://127.0.0.1:<port>`, Lookout's own server (port 47821 unless taken), and send the token from `~/.claude/lookout/server.json` in the `x-lookout-token` header. Lookout creates that token on your machine; it is no credential of another service.
+- From the environment it reads `HOME` or `USERPROFILE` (to find `~/.claude`) and `TERM_PROGRAM` (which terminal app to open or switch to). Neither leaves your machine.
+
 ## Settings
 
 One file, `~/.claude/lookout/config.json`, read by every session within 10 seconds. Change it with `/lookout settings` (switches and models) or on the Settings tab (everything, including numbers, agent types and keywords). Missing or invalid values fall back to the defaults in `hooks/settings.ts`.

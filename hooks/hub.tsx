@@ -73,7 +73,7 @@ export async function collect($: EngineInterface): Promise<void> {
   lastCollectAt = startedAt
   collecting = true
   try {
-    const result = await $.process.run(['bun', `${$.plugin.root}/scripts/collect.mjs`], { timeoutMs: 20_000 })
+    const result = await $.process.run(['bun', '--no-install', `${$.plugin.root}/scripts/collect.mjs`], { timeoutMs: 20_000 })
     if (result.exitCode !== 0) {
       await update($, notice, () => `Collector failed: ${result.stderr.slice(0, 200)}`)
       return
@@ -98,7 +98,7 @@ async function migrateLegacyData($: EngineInterface): Promise<void> {
     let isFound = false
     for (const dir of LEGACY_DATA_DIRS) if (await $.fs.exists(`${home}/.claude/${dir}`)) isFound = true
     if (!isFound) return
-    await $.process.run(['bun', `${$.plugin.root}/scripts/collect.mjs`, '--migrate'], { timeoutMs: 20_000 })
+    await $.process.run(['bun', '--no-install', `${$.plugin.root}/scripts/collect.mjs`, '--migrate'], { timeoutMs: 20_000 })
   } catch {}
 }
 
@@ -108,7 +108,7 @@ export async function loadAgent($: EngineInterface, sessionId: string, agentId: 
     await update($, agentView, () => null)
     return
   }
-  const result = await $.process.run(['bun', `${$.plugin.root}/scripts/collect.mjs`, '--agent', sessionId, agentId, '12'], { timeoutMs: 20_000 })
+  const result = await $.process.run(['bun', '--no-install', `${$.plugin.root}/scripts/collect.mjs`, '--agent', sessionId, agentId, '12'], { timeoutMs: 20_000 })
   if (result.exitCode !== 0) {
     await update($, notice, () => `Agent failed: ${result.stderr.slice(0, 200)}`)
     return
@@ -119,7 +119,7 @@ export async function loadAgent($: EngineInterface, sessionId: string, agentId: 
 
 export async function loadDetail($: EngineInterface, sessionId: string): Promise<void> {
   const result = await $.process.run(
-    ['bun', `${$.plugin.root}/scripts/collect.mjs`, '--detail', sessionId, String(DETAIL_COUNT)],
+    ['bun', '--no-install', `${$.plugin.root}/scripts/collect.mjs`, '--detail', sessionId, String(DETAIL_COUNT)],
     { timeoutMs: 20_000 },
   )
   if (result.exitCode !== 0) {
@@ -264,7 +264,7 @@ async function ensureServer($: EngineInterface): Promise<ServerInfo | null> {
   }
   if (!serverChild) {
     serverChild = true
-    const child = $.process.spawn({ argv: ['bun', `${$.plugin.root}/scripts/server.mjs`] })
+    const child = $.process.spawn({ argv: ['bun', '--no-install', `${$.plugin.root}/scripts/server.mjs`] })
     void (async () => {
       try {
         for await (const piece of child) void piece
@@ -585,7 +585,7 @@ async function updateBrief($: EngineInterface): Promise<void> {
   lastBriefAt = now
   try {
     const me = await $.session.id()
-    const run = await $.process.run(['bun', `${$.plugin.root}/scripts/collect.mjs`, '--brief-input', me], { timeoutMs: 20_000 })
+    const run = await $.process.run(['bun', '--no-install', `${$.plugin.root}/scripts/collect.mjs`, '--brief-input', me], { timeoutMs: 20_000 })
     if (run.exitCode !== 0) return
     const input = JSON.parse(run.stdout) as { messages: { role: string; text: string }[]; previous: HubBrief | null }
     if (input.messages.length === 0) return

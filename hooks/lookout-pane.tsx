@@ -103,7 +103,7 @@ function ordered(list: HubSession[]): HubSession[] {
 }
 
 async function markRead($: EngineInterface, sessionId: string): Promise<void> {
-  await $.process.run(['bun', `${$.plugin.root}/scripts/collect.mjs`, '--read', sessionId], { timeoutMs: 10_000 }).catch(() => undefined)
+  await $.process.run(['bun', '--no-install', `${$.plugin.root}/scripts/collect.mjs`, '--read', sessionId], { timeoutMs: 10_000 }).catch(() => undefined)
 }
 
 async function choose($: EngineInterface, sessionId: string | null): Promise<void> {
