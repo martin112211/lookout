@@ -1,6 +1,6 @@
 {
   "name": "lookout",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Run many Claude Code sessions as one: live overview by repo and branch, answers from anywhere, catch-up since you last looked, session briefs, decision ledger, collision radar, leases, budget guard, model routing, status line and git pane. Terminal, Claude Desktop and a local web page.",
   "author": {
     "name": "Martin Hoppe"
