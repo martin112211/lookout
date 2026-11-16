@@ -106,7 +106,7 @@ export const DEFAULT_CONFIG: HubConfig = {
     gitPane: { on: true },
     skinsColors: { on: true },
     cacheTax: { on: true },
-    pinBrief: { on: false },
+    pinBrief: { on: true },
   },
   orchestrator: {
     on: false,

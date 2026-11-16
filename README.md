@@ -15,7 +15,7 @@ It works in the terminal, in Claude Desktop and on a local web page, on macOS an
 - **Jump to a session.** "Open" brings the session's own terminal tab to the front (macOS: Ghostty, Terminal, iTerm).
 - **Answer from one place.** Pick an option with a number key, type your own answer or write to a session. It arrives as your own input.
 - **Catch-up.** "Since your last look" lists commits, finished agents, compactions and files two sessions share. A recap appears above the prompt when you return to a session.
-- **Session briefs.** Goal, decisions, next step and blocker for every session, written by a small model after each turn and handed back after compaction. Optionally pinned above the prompt (Settings: "Brief pinned above the prompt").
+- **Session briefs.** Goal, decisions, next step and blocker for every session, written by a small model after each turn and handed back after compaction. The session's goal and next step stay pinned above the prompt (switch off in Settings: "Brief pinned above the prompt").
 - **Decision log.** Every answered question and decision, searchable, one click to save as memory.
 - **No collisions.** A warning when two sessions edit the same file, and `git commit` and integration tests wait while another session holds them.
 - **Limits.** 5-hour and weekly usage with reset times, and a guard that stops new subagents above a weekly threshold.
@@ -125,6 +125,15 @@ Everything stays on your machine.
 - The web server listens on 127.0.0.1 only and needs a token. The page loads nothing from the internet.
 - Two features call a model through your own Claude account and count toward your usage: session briefs and the routing classifier. Both use Haiku by default, and both can be switched off.
 - Messages from the page to a session are signed with a per-machine key and expire after 5 minutes. Permission prompts are shown read-only and cannot be approved from the page.
+
+What Lookout runs on your machine:
+
+- **Bun** runs the collector (`scripts/collect.mjs`), which reads the session and transcript files, and the local web server (`scripts/server.mjs`), started by `/lookout-web` or the first session that needs it.
+- **git** reads status, branches, recent commits and diffs for the status line, `/git`, the repo cards and "Show diff". Lookout never commits or pushes on its own; "Commit" on the page sends the session a request to do it.
+- **ps** reads the terminal device and terminal app of a session's process, so "Open" can find its tab. **uname** tells macOS from Linux.
+- **osascript** (macOS only) brings a session's Ghostty, Terminal or iTerm tab to the front when you press "Open", opens a Terminal window for "Fork", and brings the terminal forward from the page. macOS asks you to allow this under Privacy & Security, Automation.
+- **Terminal and browser openers**: `open` (macOS), `wt` (Windows Terminal) or `x-terminal-emulator` start a new tab for "Fork" and "Attach"; `open`, `rundll32` or `xdg-open` open the web page in your browser.
+- Network: the hooks talk only to Lookout's own server on 127.0.0.1. The only requests that leave your machine are the two optional model calls above, made through Claude Code.
 
 | Path | Content | Copy to a new machine? |
 |---|---|---|
