@@ -27,6 +27,8 @@ It works in the terminal, in Claude Desktop and on a local web page, on macOS an
 |---|---|
 | ![Decision log](docs/images/decisions.png) | ![Time per work item](docs/images/time.png) |
 
+![Agent live view: a running subagent's task, tool calls and results, opened from its chip on the session card](docs/images/agent.png)
+
 ## Requirements
 
 - Claude Code with mods (function hooks).
@@ -65,6 +67,8 @@ Keys on the web page: `j` and `k` select, `n` next open item, `1` to `9` answer,
 |---|---|---|---|
 | Overview and answers | `/lookout` pane | same pane | Overview tab |
 | Recap | band above the prompt | band above the prompt | catch-up list |
+| Brief | pinned above the prompt | pinned above the prompt | focus panel |
+| Agent live view | `/lookout` pane, `a` | same pane | click an agent or its chip |
 | Decisions, Time | | | own tabs |
 | Settings | `/lookout settings` | `/lookout settings` | Settings tab, all values |
 | Status line, `/git` | yes | yes | |
