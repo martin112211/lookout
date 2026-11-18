@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
+import { isOlderVersion } from '../hooks/config'
 import { isSameDecision } from '../hooks/decisions'
 import { browserArgv, focusSessionArgv, parseProcessInfo, tabArgv } from '../hooks/terminal'
 
@@ -63,5 +64,15 @@ describe('ledger', () => {
   test('different decisions stay apart', async () => {
     expect(isSameDecision('The agent view and the grouping by repo and branch are approved.', 'The owner picks directions B and C combined; the agent view and the grouping by repo and branch are approved.')).toBe(false)
     expect(isSameDecision('The name Lookout is confirmed.', 'All three looks stay; Calm is the default.')).toBe(false)
+  })
+})
+
+describe('server version', () => {
+  test('a server older than the installed mod, or without a version, is replaced', async () => {
+    expect(isOlderVersion(undefined, '0.5.6')).toBe(true)
+    expect(isOlderVersion('0.5.4', '0.5.6')).toBe(true)
+    expect(isOlderVersion('0.5.10', '0.5.9')).toBe(false)
+    expect(isOlderVersion('0.6.0', '0.5.9')).toBe(false)
+    expect(isOlderVersion('0.5.6', '0.5.6')).toBe(false)
   })
 })

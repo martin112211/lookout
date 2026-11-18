@@ -1,6 +1,6 @@
 /* Lookout page: data loop, events and keys. */
 
-const TABS = ['overview', 'decisions', 'time', 'settings']
+const TABS = ['overview', 'radar', 'decisions', 'time', 'settings']
 
 function setTab(tab) {
   if (!TABS.includes(tab)) return
@@ -12,6 +12,7 @@ function setTab(tab) {
   if (tab === 'time') { renderTime(); loadTime() }
   if (tab === 'settings') { renderSettings(); loadSettings() }
   if (tab === 'overview') { renderOverview(); renderFocus() }
+  if (tab === 'radar') renderRadar()
 }
 
 function notifyChanges() {
@@ -57,9 +58,11 @@ async function refresh() {
       renderOverview()
       renderFocus()
     }
+    if (state.tab === 'radar') renderRadar()
   } catch {
     $('offline').classList.add('show')
     $('live').classList.add('off')
+    setTabIcon({ offline: true })
   }
 }
 

@@ -7,7 +7,7 @@ import { CLASSIFIER_MODES, EFFORT_CHOICES, FEATURE_LABELS, applyProfile, MODEL_C
 import { classifiedTier, modelRank, nextEffortUp, nextModelUp } from './routing'
 import type { RouteDecision, RouteInput } from './routing'
 import { isSameDecision } from './decisions'
-import { LEGACY_DATA_DIRS, homeDir, hubFile, loadConfig, platform, saveConfig } from './config'
+import { LEGACY_DATA_DIRS, homeDir, hubFile, isOlderVersion, loadConfig, platform, saveConfig } from './config'
 import { browserArgv, tabArgv, tabName } from './terminal'
 import type { TabRequest } from './terminal'
 import { gitAfterTool, gitStart, gitTurn } from './git-pane'
@@ -246,21 +246,66 @@ async function readServerInfo($: EngineInterface): Promise<ServerInfo | null> {
   }
 }
 
-async function isServerUp($: EngineInterface, info: ServerInfo | null): Promise<boolean> {
-  if (!info) return false
+type Ping = { pid?: number; version?: string }
+
+async function pingServer($: EngineInterface, info: ServerInfo | null): Promise<Ping | null> {
+  if (!info) return null
   try {
     const response = await $.http.fetch(`http://127.0.0.1:${info.port}/api/ping`, { headers: { 'x-lookout-token': info.token } })
-    return response.ok
+    if (!response.ok) return null
+    try {
+      return JSON.parse(response.text) as Ping
+    } catch {
+      return {}
+    }
   } catch {
-    return false
+    return null
+  }
+}
+
+async function isServerUp($: EngineInterface, info: ServerInfo | null): Promise<boolean> {
+  return (await pingServer($, info)) !== null
+}
+
+let ownVersion: string | null = null
+async function pluginVersion($: EngineInterface): Promise<string> {
+  if (ownVersion) return ownVersion
+  try {
+    ownVersion = String((JSON.parse(await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`)) as { version?: string }).version ?? '0.0.0')
+  } catch {
+    ownVersion = '0.0.0'
+  }
+  return ownVersion
+}
+
+// A server keeps running after a plugin update; replace it when it is older than this mod.
+async function stopServer($: EngineInterface, info: ServerInfo, ping: Ping): Promise<void> {
+  const stopped = await $.http
+    .fetch(`http://127.0.0.1:${info.port}/api/shutdown`, { method: 'POST', headers: { 'x-lookout-token': info.token } })
+    .then(response => response.ok)
+    .catch(() => false)
+  if (!stopped && ping.pid) {
+    const argv = (await platform($)) === 'windows' ? ['taskkill', '/PID', String(ping.pid), '/F'] : ['kill', String(ping.pid)]
+    await $.process.run(argv, { timeoutMs: 5000 }).catch(() => undefined)
+  }
+  for (let attempt = 0; attempt < 20; attempt++) {
+    if (!(await isServerUp($, info))) return
+    await $.clock.sleep(150)
   }
 }
 
 async function ensureServer($: EngineInterface): Promise<ServerInfo | null> {
   const known = await readServerInfo($)
-  if (await isServerUp($, known)) {
-    server = known
-    return known
+  const ping = await pingServer($, known)
+  if (known && ping) {
+    const mine = await pluginVersion($)
+    if (!isOlderVersion(ping.version, mine)) {
+      server = known
+      return known
+    }
+    await stopServer($, known, ping)
+    server = null
+    await update($, notice, () => `Lookout server ${ping.version ?? '(old)'} replaced by ${mine}`)
   }
   if (!serverChild) {
     serverChild = true
@@ -318,8 +363,9 @@ async function pollOutbox($: EngineInterface): Promise<void> {
     if (now < nextServerCheckAt) return
     nextServerCheckAt = now + 30_000
     const info = await readServerInfo($)
-    if (!(await isServerUp($, info))) return
-    server = info
+    const ping = await pingServer($, info)
+    if (!ping) return
+    server = isOlderVersion(ping.version, await pluginVersion($)) ? await ensureServer($) : info
   }
   if (!server) return
   polling = true

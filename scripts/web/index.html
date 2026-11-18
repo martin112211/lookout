@@ -4,14 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lookout</title>
+<link rel="icon" type="image/svg+xml" href="/assets/icon.svg">
+<link rel="apple-touch-icon" href="/assets/touch-icon.png">
+<meta name="theme-color" content="#161a22">
 <link rel="stylesheet" href="/assets/lookout.css">
 </head>
 <body>
 <div class="app">
   <div class="top">
-    <span class="name">Lookout</span>
+    <span class="name"><span class="mark" id="mark" aria-hidden="true"><img src="/assets/icon.svg" alt="" width="22" height="22"></span>Lookout</span>
     <span class="tabs" id="tabs" role="tablist">
       <button type="button" data-tab="overview" aria-pressed="true">Overview</button>
+      <button type="button" data-tab="radar" aria-pressed="false">Radar</button>
       <button type="button" data-tab="decisions" aria-pressed="false">Decisions</button>
       <button type="button" data-tab="time" aria-pressed="false">Time</button>
       <button type="button" data-tab="settings" aria-pressed="false">Settings</button>
@@ -36,6 +40,7 @@
     </div>
     <div class="keys"><span><span class="kbd">j</span> <span class="kbd">k</span> select</span><span><span class="kbd">n</span> next open item</span><span><span class="kbd">1</span>-<span class="kbd">9</span> answer</span><span><span class="kbd">r</span> write</span><span><span class="kbd">o</span> open in terminal</span><span><span class="kbd">e</span> mark read</span><span><span class="kbd">?</span> show diff</span></div>
   </section>
+  <section id="tab-radar" class="page" hidden></section>
   <section id="tab-decisions" class="page" hidden></section>
   <section id="tab-time" class="page" hidden></section>
   <section id="tab-settings" class="page" hidden></section>
@@ -59,6 +64,7 @@
 <div class="toasts" id="toasts" role="status"></div>
 <script src="/assets/core.js"></script>
 <script src="/assets/overview.js"></script>
+<script src="/assets/radar.js"></script>
 <script src="/assets/tabs.js"></script>
 <script src="/assets/main.js"></script>
 </body>

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
-import { agentDetail, collectSessions, collisions, findRegistration, forkName, hubDir, ledger, readBrief, sessionDetail, sessionTitle } from './hub-data.mjs'
+import { agentDetail, collectSessions, collisions, findRegistration, forkName, hubDir, ledger, readBrief, runGit, sessionDetail, sessionTitle } from './hub-data.mjs'
 import { dayKey, scanFile, sessionIdOf, titleOf, transcriptsSince } from './scan.mjs'
 import { DEFAULT_CONFIG, FEATURE_LABELS, MODEL_CHOICES, PRESETS, draftRoute, routeAgent, sanitizeConfig } from '../hooks/settings.ts'
 import { focusArgv, focusSessionArgv, parseProcessInfo, processInfoArgv, tabArgv } from '../hooks/terminal.ts'
@@ -77,7 +77,9 @@ const HOST = '127.0.0.1'
 const configPath = join(hubDir, 'server.json')
 const pagePath = join(import.meta.dir, 'web', 'index.html')
 const assetsDir = join(import.meta.dir, 'web', 'assets')
-const ASSET_TYPES = { js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8' }
+const ASSET_TYPES = { js: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', svg: 'image/svg+xml', png: 'image/png', webmanifest: 'application/manifest+json' }
+const VERSION = readJsonFile(join(import.meta.dir, '..', '.claude-plugin', 'plugin.json'), {}).version ?? '0.0.0'
+const startedAt = Date.now()
 const ALLOWED_HOSTS = new Set([`127.0.0.1:${PORT}`, `localhost:${PORT}`])
 const QUEUE_TTL_MS = 10 * 60_000
 
@@ -339,7 +341,12 @@ function openTab(request) {
 
 async function handleApi(request, url) {
   const path = url.pathname
-  if (path === '/api/ping') return json({ ok: true, pid: process.pid })
+  if (path === '/api/ping') return json({ ok: true, pid: process.pid, version: VERSION, startedAt })
+  if (path === '/api/shutdown' && request.method === 'POST') {
+    process.stdout.write(`shutting down ${VERSION} on request\n`)
+    setTimeout(() => process.exit(0), 100)
+    return json({ ok: true, pid: process.pid })
+  }
   if (path === '/api/sessions' && request.method === 'GET') {
     const all = collectSessions()
     const repos = collisions(all)
@@ -392,7 +399,7 @@ async function handleApi(request, url) {
     const root = session.repo.root.replace(/\\/g, '/').toLowerCase()
     const files = (session.events ?? []).filter(e => e.kind === 'edit' && String(e.label).replace(/\\/g, '/').toLowerCase().startsWith(`${root}/`)).map(e => e.label)
     if (!files.length) return json({ diff: '', files: [] })
-    const result = spawnSync('git', ['-C', session.repo.root, '--no-optional-locks', '-c', 'core.quotePath=false', 'diff', '--stat', '--patch', 'HEAD', '--', ...new Set(files)], { encoding: 'utf8', timeout: 5000, maxBuffer: 8 * 1024 * 1024 })
+    const result = runGit(['-C', session.repo.root, '--no-optional-locks', '-c', 'core.quotePath=false', 'diff', '--stat', '--patch', 'HEAD', '--', ...new Set(files)], { timeout: 5000, maxBuffer: 8 * 1024 * 1024 })
     return json({ diff: (result.stdout || '').slice(0, 200_000), files: [...new Set(files)] })
   }
   if (path === '/api/focus' && request.method === 'POST') {
@@ -553,11 +560,13 @@ try {
     async fetch(request) {
       const url = new URL(request.url)
       if (!ALLOWED_HOSTS.has(request.headers.get('host') ?? '')) return new Response('forbidden host', { status: 403 })
-      const asset = /^\/assets\/([a-z0-9-]+)\.(js|css)$/.exec(url.pathname)
+      if (url.pathname === '/favicon.ico' && request.method === 'GET') return Response.redirect('/assets/icon.svg', 301)
+      const asset = /^\/assets\/([a-z0-9-]+)\.(js|css|svg|png|webmanifest)$/.exec(url.pathname)
       if (asset && request.method === 'GET') {
         const file = join(assetsDir, `${asset[1]}.${asset[2]}`)
         if (!existsSync(file)) return new Response('not found', { status: 404 })
-        return new Response(readFileSync(file, 'utf8'), { headers: { 'content-type': ASSET_TYPES[asset[2]], 'cache-control': 'no-store' } })
+        const isText = asset[2] !== 'png'
+        return new Response(isText ? readFileSync(file, 'utf8') : readFileSync(file), { headers: { 'content-type': ASSET_TYPES[asset[2]], 'cache-control': isText ? 'no-store' : 'max-age=86400' } })
       }
       const given = url.searchParams.get('token') ?? request.headers.get('x-lookout-token')
       if (given !== token) return new Response('missing or wrong token', { status: 401 })
@@ -583,5 +592,5 @@ try {
   throw error
 }
 
-writeFileSync(configPath, JSON.stringify({ port: PORT, token, pid: process.pid, url: `http://${HOST}:${PORT}/?token=${token}` }))
-process.stdout.write(`listening http://${HOST}:${PORT}\n`)
+writeFileSync(configPath, JSON.stringify({ port: PORT, token, pid: process.pid, version: VERSION, url: `http://${HOST}:${PORT}/?token=${token}` }))
+process.stdout.write(`listening http://${HOST}:${PORT} (lookout ${VERSION})\n`)

@@ -11,6 +11,7 @@ It works in the terminal, in Claude Desktop and on a local web page, on macOS an
 ## What you get
 
 - **One overview.** Every live session, grouped by repository and branch, with its status, its open question or approval, unread replies, recent activity, running agents and context fill.
+- **Radar.** Every session as a blip: the angle is its repository, the distance how long ago it last moved. Sessions that need you pulse, running agents circle their session, the sweep lights up each blip it passes. The browser tab's icon counts the sessions that need you.
 - **See what an agent does.** Click a subagent and follow it live: its task, each tool call and what came back.
 - **Jump to a session.** "Open" brings the session's own terminal tab to the front (macOS: Ghostty, Terminal, iTerm; Windows: Windows Terminal).
 - **Answer from one place.** Pick an option with a number key, type your own answer or write to a session. It arrives as your own input.
@@ -28,6 +29,8 @@ It works in the terminal, in Claude Desktop and on a local web page, on macOS an
 | ![Decision log](docs/images/decisions.png) | ![Time per work item](docs/images/time.png) |
 
 ![Agent live view: a running subagent's task, tool calls and results, opened from its chip on the session card](docs/images/agent.png)
+
+![Radar: sessions as blips by repository and time since they last moved, with the sweep and the contact list](docs/images/radar.png)
 
 ## Requirements
 
@@ -66,6 +69,7 @@ Keys on the web page: `j` and `k` select, `n` next open item, `1` to `9` answer,
 | | Terminal | Claude Desktop | Web page |
 |---|---|---|---|
 | Overview and answers | `/lookout` pane | same pane | Overview tab |
+| Radar | | | Radar tab |
 | Recap | band above the prompt | band above the prompt | catch-up list |
 | Brief | pinned above the prompt | pinned above the prompt | focus panel |
 | Agent live view | `/lookout` pane, `a` | same pane | click an agent or its chip |
@@ -143,7 +147,7 @@ Everything stays on your machine.
 
 What Lookout runs on your machine:
 
-- **Bun** runs the collector (`scripts/collect.mjs`), which reads the session and transcript files, and the local web server (`scripts/server.mjs`), started by `/lookout-web` or the first session that needs it.
+- **Bun** runs the collector (`scripts/collect.mjs`), which reads the session and transcript files, and the local web server (`scripts/server.mjs`), started by `/lookout-web` or the first session that needs it. After a plugin update the first session with the new version replaces an older running server.
 - **git** reads status, branches, recent commits and diffs for the status line, `/git`, the repo cards and "Show diff". Lookout never commits or pushes on its own; "Commit" on the page sends the session a request to do it.
 - **ps** reads the terminal device and terminal app of a session's process, so "Open" can find its tab. **uname** tells macOS from Linux.
 - **osascript** (macOS only) brings a session's Ghostty, Terminal or iTerm tab to the front when you press "Open", opens a Terminal window for "Fork", and brings the terminal forward from the page. macOS asks you to allow this under Privacy & Security, Automation.

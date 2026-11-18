@@ -152,12 +152,13 @@ function renderOverview(force = false) {
       }
     })
     const repoInfo = state.repos.find(r => r.root === repo.root)
-    const uncommitted = repoInfo ? `${repoInfo.files.length} uncommitted` : repo.isGit ? '' : 'not a git repository'
+    const uncommitted = repoInfo?.stale ? '' : repoInfo ? `${repoInfo.files.length} uncommitted` : repo.isGit ? '' : 'not a git repository'
+    const stale = repoInfo?.stale ? `<span class="m stale" title="${esc(`${repoInfo.error || 'git status failed'} (${repoInfo.failures || 1}x in a row). The file list is from the last good run.`)}">git status failed${repoInfo.files.length ? ` · ${repoInfo.files.length} files as of last run` : ''}</span>` : ''
     const ids = new Set(repo.branches.flatMap(([, sessions]) => sessions.map(s => s.sessionId)))
     const locks = state.leases.filter(l => ids.has(l.sessionId)).map(l => `<span class="lock held">● ${esc(l.purpose || l.key)} · ${esc(l.name || sessionName(l.sessionId))}<button type="button" data-release="${esc(l.key)}" title="Free a lock a crashed session left behind">×</button></span>`).join('')
     const shared = (repoInfo?.files || []).filter(f => f.sessions.length > 1)
     const clash = shared.length ? `<span class="chip x" title="${esc(shared.map(f => f.path).join('\n'))}">${shared.length} file${shared.length > 1 ? 's' : ''} edited by two sessions: ${esc(shared.slice(0, 2).map(f => folderOf(f.path)).join(', '))}</span>` : ''
-    return `<div class="rc" data-repo="${ri}"><div class="rh"><b>${esc(repo.name)}</b><span class="m">${esc(uncommitted)}</span>${locks}${clash}</div><div class="rbody"><div class="rails"><svg aria-hidden="true"></svg></div><div class="rows">${rows.join('')}</div></div></div>`
+    return `<div class="rc" data-repo="${ri}"><div class="rh"><b>${esc(repo.name)}</b><span class="m">${esc(uncommitted)}</span>${stale}${locks}${clash}</div><div class="rbody"><div class="rails"><svg aria-hidden="true"></svg></div><div class="rows">${rows.join('')}</div></div></div>`
   }).join('')
   if (!force && $('overview').dataset.sig === html) return
   const focusedId = document.activeElement?.closest?.('.srow')?.dataset.id
@@ -634,4 +635,5 @@ function renderLimits() {
   $('live-text').textContent = `${state.sessions.length} live · ${working} working · ${clock(state.now)}`
   const waiting = openSessions().length
   document.title = waiting ? `(${waiting}) Lookout` : 'Lookout'
+  setTabIcon({ waiting, working: working > 0 })
 }

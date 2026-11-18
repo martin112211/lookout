@@ -57,3 +57,14 @@ export async function saveConfig($: EngineInterface, change: (config: HubConfig)
   await $.fs.write(path, `${JSON.stringify(next, null, 2)}\n`)
   configCache = { at: await $.clock.now(), value: next }
 }
+
+// A running server without a version predates the handshake, so it counts as older.
+export function isOlderVersion(running: string | undefined, installed: string): boolean {
+  if (!running) return true
+  const a = running.split('.').map(part => Number.parseInt(part, 10) || 0)
+  const b = installed.split('.').map(part => Number.parseInt(part, 10) || 0)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0)
+  }
+  return false
+}

@@ -251,11 +251,24 @@ function normalizePath(path) {
   return String(path).replace(/\\/g, '/').replace(/^([a-z]):/, (_, d) => `${d.toUpperCase()}:`).toLowerCase()
 }
 
+// A server started from a hook can inherit variables that pin git to one repository or index.
+const GIT_PINS = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES', 'GIT_COMMON_DIR', 'GIT_NAMESPACE', 'GIT_PREFIX']
+const gitEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !GIT_PINS.includes(key.toUpperCase())))
+
+export function runGit(args, options = {}) {
+  return spawnSync('git', args, { encoding: 'utf8', windowsHide: true, maxBuffer: 16 * 1024 * 1024, env: gitEnv, ...options })
+}
+
+function gitFailure(result) {
+  const reason = result.error?.code ?? result.signal ?? `exit ${result.status}`
+  return `${reason} ${String(result.stderr ?? '').trim().split(/\r?\n/)[0] ?? ''}`.trim()
+}
+
 const repoCache = new Map()
 function gitRoot(cwd) {
   const key = normalizePath(cwd)
   if (repoCache.has(key)) return repoCache.get(key)
-  const result = spawnSync('git', ['-C', cwd, 'rev-parse', '--show-toplevel'], { encoding: 'utf8', timeout: 3000 })
+  const result = runGit(['-C', cwd, 'rev-parse', '--show-toplevel'], { timeout: 3000 })
   if (result.status !== 0) return result.stderr && /not a git repository/i.test(result.stderr) ? (repoCache.set(key, null), null) : null
   const root = result.stdout.trim()
   repoCache.set(key, root)
@@ -275,10 +288,14 @@ export function collisions(sessions) {
   }
   const repos = []
   for (const [root, members] of byRepo) {
-    const status = spawnSync('git', ['-C', root, '--no-optional-locks', '-c', 'core.quotePath=false', 'status', '--porcelain', '--untracked-files=normal'], { encoding: 'utf8', timeout: 4000 })
+    const status = runGit(['-C', root, '--no-optional-locks', '-c', 'core.quotePath=false', 'status', '--porcelain', '--untracked-files=normal'], { timeout: 4000 })
     if (status.status !== 0) {
+      // Membership stays current; only the file list may be old, and the card says so.
       const previous = collisionCache.value.find(one => one.root === root)
-      if (previous) repos.push(previous)
+      const failures = (previous?.failures ?? 0) + 1
+      const error = gitFailure(status)
+      if (failures === 1 || failures % 30 === 0) console.warn(`[lookout] git status failed for ${root} (${failures}x): ${error}`)
+      repos.push({ root, name: root.split('/').at(-1), sessions: members.map(one => one.sessionId), files: previous?.files ?? [], stale: true, error, failures })
       continue
     }
     const touchedBy = new Map()

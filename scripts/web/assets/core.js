@@ -29,6 +29,30 @@ function post(path, payload) {
   return api(path, { method: 'POST', body: JSON.stringify(payload ?? {}) })
 }
 
+/* Radar mark for the tab and the top bar: the beam is lit while a session works, the badge counts sessions that need you. */
+function lookoutIcon({ waiting = 0, working = true, offline = false, square = false } = {}) {
+  const beam = offline ? '#5f6773' : working ? '#6aa6f8' : '#8b95a7'
+  const ring = offline ? '#3a404b' : working ? '#3d5a86' : '#434b5a'
+  const blip = offline ? '#5f6773' : '#f2a33a'
+  const label = waiting > 9 ? '9+' : String(waiting)
+  const badge = waiting ? `<circle cx="49" cy="15" r="13" fill="#f2a33a" stroke="#161a22" stroke-width="4"/><text x="49" y="15" dy=".36em" text-anchor="middle" font-family="system-ui,-apple-system,Segoe UI,sans-serif" font-weight="800" font-size="${waiting > 9 ? 13 : 18}" fill="#161a22">${label}</text>` : ''
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="${square ? 0 : 15}" fill="#161a22"/><circle cx="32" cy="32" r="22.5" fill="none" stroke="${ring}" stroke-width="4"/><circle cx="32" cy="32" r="11" fill="none" stroke="${ring}" stroke-width="3"/><g class="sweep"><path d="M32 32V9.5A22.5 22.5 0 0 1 51.5 20.75Z" fill="${beam}" fill-opacity=".3"/><path d="M32 32L51.5 20.75" stroke="${beam}" stroke-width="4.5" stroke-linecap="round"/></g><circle cx="32" cy="32" r="4.5" fill="${beam}"/><circle class="spot" cx="40.5" cy="16.5" r="6" fill="${blip}"/>${badge}</svg>`
+}
+
+let tabIconSig = ''
+function setTabIcon(look) {
+  const sig = JSON.stringify(look)
+  if (sig === tabIconSig) return
+  tabIconSig = sig
+  const link = document.querySelector('link[rel="icon"]')
+  if (link) link.href = `data:image/svg+xml,${encodeURIComponent(lookoutIcon(look))}`
+  const mark = $('mark')
+  if (!mark) return
+  mark.innerHTML = lookoutIcon({ ...look, waiting: 0 })
+  mark.classList.toggle('working', Boolean(look.working) && !look.offline)
+  mark.classList.toggle('waiting', Boolean(look.waiting) && !look.offline)
+}
+
 function esc(text) {
   return String(text ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 }
