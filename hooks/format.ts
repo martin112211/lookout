@@ -114,6 +114,7 @@ export const segments = (s: Snapshot, now: Date): Seg[][] => {
 
   if (s.costUsd !== undefined) groups.push([{ text: `$${s.costUsd.toFixed(2)}`, slot: 'web' }])
   if (s.cacheTax) groups.push([{ text: 'cache ', slot: 'muted' }, { text: s.cacheTax, slot: 'fg' }])
+  if (s.update) groups.push([{ text: `↑ Lookout ${s.update}`, slot: 'warn' }])
 
   return groups
 }

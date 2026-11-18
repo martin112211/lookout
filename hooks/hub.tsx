@@ -7,7 +7,8 @@ import { CLASSIFIER_MODES, EFFORT_CHOICES, FEATURE_LABELS, applyProfile, MODEL_C
 import { classifiedTier, modelRank, nextEffortUp, nextModelUp } from './routing'
 import type { RouteDecision, RouteInput } from './routing'
 import { isSameDecision } from './decisions'
-import { LEGACY_DATA_DIRS, homeDir, hubFile, isOlderVersion, loadConfig, platform, saveConfig } from './config'
+import { LEGACY_DATA_DIRS, homeDir, hubFile, loadConfig, platform, saveConfig } from './config'
+import { checkForUpdate, isOlderVersion, pluginVersion } from './update'
 import { browserArgv, tabArgv, tabName } from './terminal'
 import type { TabRequest } from './terminal'
 import { gitAfterTool, gitStart, gitTurn } from './git-pane'
@@ -267,17 +268,6 @@ async function isServerUp($: EngineInterface, info: ServerInfo | null): Promise<
   return (await pingServer($, info)) !== null
 }
 
-let ownVersion: string | null = null
-async function pluginVersion($: EngineInterface): Promise<string> {
-  if (ownVersion) return ownVersion
-  try {
-    ownVersion = String((JSON.parse(await $.fs.read(`${$.plugin.root}/.claude-plugin/plugin.json`)) as { version?: string }).version ?? '0.0.0')
-  } catch {
-    ownVersion = '0.0.0'
-  }
-  return ownVersion
-}
-
 // A server keeps running after a plugin update; replace it when it is older than this mod.
 async function stopServer($: EngineInterface, info: ServerInfo, ping: Ping): Promise<void> {
   const stopped = await $.http
@@ -307,7 +297,11 @@ async function ensureServer($: EngineInterface): Promise<ServerInfo | null> {
     server = null
     await update($, notice, () => `Lookout server ${ping.version ?? '(old)'} replaced by ${mine}`)
   }
-  if (!serverChild) {
+  const detached = await $.process
+    .run(['bun', '--no-install', `${$.plugin.root}/scripts/server.mjs`, '--detach'], { timeoutMs: 15_000 })
+    .then(result => result.exitCode === 0)
+    .catch(() => false)
+  if (!detached && !serverChild) {
     serverChild = true
     const child = $.process.spawn({ argv: ['bun', '--no-install', `${$.plugin.root}/scripts/server.mjs`] })
     void (async () => {
@@ -1161,6 +1155,10 @@ export const registerHub = (on: On): void => {
     })
     $.clock.every(60_000, () => {
       void writeUsage($).catch(() => undefined)
+    })
+    void checkForUpdate($).catch(() => undefined)
+    $.clock.every(60 * 60_000, () => {
+      void checkForUpdate($).catch(() => undefined)
     })
     void writeUsage($).catch(() => undefined)
     await statusStart($)

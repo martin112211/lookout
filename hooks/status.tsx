@@ -8,6 +8,7 @@ import { paletteFor } from './palettes'
 import type { CustomSkin } from './palettes'
 import { hubFile, loadConfig } from './config'
 import { installedPlugins } from './integrations'
+import { availableUpdate } from './update'
 
 export const snapshot = atom({ plugin: 'lookout', key: 'statusSnapshot' } as const, null as Snapshot | null)
 const cacheTaxText = atom({ plugin: 'lookout', key: 'cacheTaxText' } as const, null as string | null)
@@ -71,11 +72,12 @@ async function hubCounts($: EngineInterface): Promise<HubCounts | undefined> {
 async function refresh($: EngineInterface) {
   if (!(await loadConfig($)).features.statusLine.on) return
   const cacheTax = (await cacheTaxShown($)) ? ((await read($, cacheTaxText)) ?? undefined) : undefined
-  const [model, cwd, usage, hub] = await Promise.all([
+  const [model, cwd, usage, hub, newer] = await Promise.all([
     $.session.model().catch(() => undefined),
     $.session.cwd().catch(() => undefined),
     $.session.usage().catch(() => undefined),
     hubCounts($),
+    availableUpdate($),
   ])
   const next: Snapshot = {
     model,
@@ -89,6 +91,7 @@ async function refresh($: EngineInterface) {
     costUsd: usage?.cost?.usd,
     hub,
     cacheTax,
+    update: newer,
   }
   await update($, snapshot, () => next)
 }

@@ -61,6 +61,7 @@ export type HubConfig = {
     skinsColors: { on: boolean }
     cacheTax: { on: boolean }
     pinBrief: { on: boolean }
+    updateCheck: { on: boolean }
   }
   orchestrator: {
     on: boolean
@@ -90,6 +91,7 @@ export const FEATURE_LABELS: Record<keyof HubConfig['features'], string> = {
   skinsColors: 'Integration: skins colours',
   cacheTax: 'Integration: cache-tax in the status line',
   pinBrief: 'Brief pinned above the prompt',
+  updateCheck: 'Check for a new Lookout version',
 }
 
 export const DEFAULT_CONFIG: HubConfig = {
@@ -107,6 +109,7 @@ export const DEFAULT_CONFIG: HubConfig = {
     skinsColors: { on: true },
     cacheTax: { on: true },
     pinBrief: { on: true },
+    updateCheck: { on: false },
   },
   orchestrator: {
     on: false,
@@ -213,6 +216,7 @@ export function sanitizeConfig(raw: unknown): HubConfig {
       skinsColors: { on: bool(pick(f, 'skinsColors').on, d.features.skinsColors.on) },
       cacheTax: { on: bool(pick(f, 'cacheTax').on, d.features.cacheTax.on) },
       pinBrief: { on: bool(pick(f, 'pinBrief').on, d.features.pinBrief.on) },
+      updateCheck: { on: bool(pick(f, 'updateCheck').on, d.features.updateCheck.on) },
     },
     orchestrator: {
       on: bool(o.on, d.orchestrator.on),

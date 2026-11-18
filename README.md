@@ -138,7 +138,7 @@ Lookout bundles no other mod. When one of these is installed, Lookout uses it; e
 
 ## Your data
 
-Everything stays on your machine.
+Everything stays on your machine. The one exception is the update check, which is off until you switch it on.
 
 - Lookout reads the session files Claude Code already writes under `~/.claude` and keeps its own state in `~/.claude/lookout`.
 - The web server listens on 127.0.0.1 only and needs a token. The page loads nothing from the internet.
@@ -147,19 +147,20 @@ Everything stays on your machine.
 
 What Lookout runs on your machine:
 
-- **Bun** runs the collector (`scripts/collect.mjs`), which reads the session and transcript files, and the local web server (`scripts/server.mjs`), started by `/lookout-web` or the first session that needs it. After a plugin update the first session with the new version replaces an older running server.
+- **Bun** runs the collector (`scripts/collect.mjs`), which reads the session and transcript files, and the local web server (`scripts/server.mjs`), started by `/lookout-web` or the first session that needs it. The server runs in a process of its own and keeps running after that session ends; its output goes to `~/.claude/lookout/server.log`. After a plugin update the first session with the new version replaces an older running server.
 - **git** reads status, branches, recent commits and diffs for the status line, `/git`, the repo cards and "Show diff". Lookout never commits or pushes on its own; "Commit" on the page sends the session a request to do it.
 - **ps** reads the terminal device and terminal app of a session's process, so "Open" can find its tab. **uname** tells macOS from Linux.
 - **osascript** (macOS only) brings a session's Ghostty, Terminal or iTerm tab to the front when you press "Open", opens a Terminal window for "Fork", and brings the terminal forward from the page. macOS asks you to allow this under Privacy & Security, Automation.
 - **powershell.exe** (Windows only) finds a session's Windows Terminal tab by its title with UI Automation, selects it and brings its window to the front when you press "Open".
 - **Terminal and browser openers**: `open` (macOS), `wt` (Windows Terminal) or `x-terminal-emulator` start a new tab for "Fork" and "Attach"; `open`, `rundll32` or `xdg-open` open the web page in your browser.
-- Network: the hooks talk only to Lookout's own server on 127.0.0.1. The only requests that leave your machine are the two optional model calls above, made through Claude Code.
+- Network: the hooks talk only to Lookout's own server on 127.0.0.1. The only requests that leave your machine are the two optional model calls above, made through Claude Code, and, when you switch on "Check for a new Lookout version" (off by default), one `git ls-remote --tags` a day against the repository Lookout was installed from. That request reads the list of release tags and sends nothing about you or your sessions. A newer version then shows in the status line and on the page.
 
 | Path | Content | Copy to a new machine? |
 |---|---|---|
 | `~/.claude/lookout/config.json` | your settings | yes |
 | `~/.claude/lookout/ledger/` | decision log | optional |
 | `~/.claude/lookout/briefs/`, `usage/`, `touches/`, `pending/`, `leases.json`, `reads.json`, `summary.json`, `titles.json`, `routing.jsonl` | live state, rebuilt automatically | no |
+| `~/.claude/lookout/update.json`, `server.log` | result of the last update check, server output | no |
 | `~/.claude/lookout/relay.key`, `server.json` | per-machine key and server token | never |
 
 ## What the hooks do
@@ -183,7 +184,7 @@ Lookout is a mod: TypeScript hooks in `hooks/` that Claude Code runs in every se
 | `ui.status` | cache-tax sets its status text | With the cache-tax switch on, takes that text into Lookout's status line. |
 | `ui.render` | drawing | Draws the panes (`/lookout`, `/lookout ask`, `/lookout settings`, `/git`), the band above the prompt (pinned brief, recap) and the status line under the prompt, which replaces that line. It never draws the `AskUserQuestion` dialog. |
 | `command.run` | `/lookout`, `/lookout-web`, `/git` | Opens the panes or the web page. |
-| `session.start` | a session starts | Starts the timers (collector every few seconds, usage every minute), moves data once from an old `~/.claude/hub` or `~/.claude/docket` folder, loads the brief. |
+| `session.start` | a session starts | Starts the timers (collector every few seconds, usage every minute, the update check every hour, which asks the network at most once a day and only when switched on), moves data once from an old `~/.claude/hub` or `~/.claude/docket` folder, loads the brief. |
 
 ### What Lookout puts in prompts
 
@@ -199,6 +200,7 @@ Only files under `~/.claude/lookout` (see the table above), including `config.js
 ### Hosts and values it reads
 
 - The hooks call only `http://127.0.0.1:<port>`, Lookout's own server (port 47821 unless taken), and send the token from `~/.claude/lookout/server.json` in the `x-lookout-token` header. Lookout creates that token on your machine; it is no credential of another service.
+- With the update check on, `git ls-remote` asks the repository Lookout was installed from: the GitHub repository of the `lookout` marketplace in `~/.claude/plugins/known_marketplaces.json`, or the `origin` of the plugin folder when it is loaded from a clone. Only `https` sources are asked.
 - From the environment it reads `HOME` or `USERPROFILE` (to find `~/.claude`) and `TERM_PROGRAM` (which terminal app to open or switch to). Neither leaves your machine.
 
 ## Settings

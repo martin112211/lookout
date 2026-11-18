@@ -294,7 +294,7 @@ export function collisions(sessions) {
       const previous = collisionCache.value.find(one => one.root === root)
       const failures = (previous?.failures ?? 0) + 1
       const error = gitFailure(status)
-      if (failures === 1 || failures % 30 === 0) console.warn(`[lookout] git status failed for ${root} (${failures}x): ${error}`)
+      if (failures === 1 || failures % 30 === 0) console.warn(`${new Date().toISOString()} git status failed for ${root} (${failures}x): ${error}`)
       repos.push({ root, name: root.split('/').at(-1), sessions: members.map(one => one.sessionId), files: previous?.files ?? [], stale: true, error, failures })
       continue
     }

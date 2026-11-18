@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, openSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 
@@ -6,8 +6,23 @@ import { agentDetail, collectSessions, collisions, findRegistration, forkName, h
 import { dayKey, scanFile, sessionIdOf, titleOf, transcriptsSince } from './scan.mjs'
 import { DEFAULT_CONFIG, FEATURE_LABELS, MODEL_CHOICES, PRESETS, draftRoute, routeAgent, sanitizeConfig } from '../hooks/settings.ts'
 import { focusArgv, focusSessionArgv, parseProcessInfo, processInfoArgv, tabArgv } from '../hooks/terminal.ts'
+import { isOlderVersion } from '../hooks/update.ts'
 import { digest, loadReads, markRead, publicSession, withCatchup } from './catchup.mjs'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+
+// `--detach` hands the server to a process of its own, so it outlives the session that asked for it.
+if (process.argv.includes('--detach')) {
+  mkdirSync(hubDir, { recursive: true })
+  const logPath = join(hubDir, 'server.log')
+  try {
+    if (statSync(logPath).size > 1_000_000) writeFileSync(logPath, '')
+  } catch {}
+  const log = openSync(logPath, 'a')
+  const child = spawn(process.execPath, ['--no-install', import.meta.path], { detached: true, stdio: ['ignore', log, log], windowsHide: true })
+  child.unref()
+  process.stdout.write(`started ${child.pid}\n`)
+  process.exit(0)
+}
 
 const settingsPath = join(hubDir, 'config.json')
 const routingPath = join(hubDir, 'routing.jsonl')
@@ -36,6 +51,12 @@ function routingLog() {
   } catch {
     return []
   }
+}
+
+function availableUpdate() {
+  if (!readSettings().features.updateCheck.on) return undefined
+  const saved = readJsonFile(join(hubDir, 'update.json'), {})
+  return saved.latest && isOlderVersion(VERSION, saved.latest) ? { latest: saved.latest, installed: VERSION, how: saved.how } : undefined
 }
 
 function recentRoutes() {
@@ -343,7 +364,7 @@ async function handleApi(request, url) {
   const path = url.pathname
   if (path === '/api/ping') return json({ ok: true, pid: process.pid, version: VERSION, startedAt })
   if (path === '/api/shutdown' && request.method === 'POST') {
-    process.stdout.write(`shutting down ${VERSION} on request\n`)
+    process.stdout.write(`${new Date().toISOString()} shutting down ${VERSION} on request\n`)
     setTimeout(() => process.exit(0), 100)
     return json({ ok: true, pid: process.pid })
   }
@@ -360,6 +381,7 @@ async function handleApi(request, url) {
       budget: budget(sessions),
       now: Date.now(),
       messaging: { isAvailable: Date.now() - lastClaimAt < 15_000, via: lastClaimBy },
+      update: availableUpdate(),
     })
   }
   if (path === '/api/detail' && request.method === 'GET') {
@@ -586,11 +608,11 @@ try {
   })
 } catch (error) {
   if (existsSync(configPath)) {
-    process.stdout.write(`already running ${readFileSync(configPath, 'utf8')}\n`)
+    process.stdout.write(`${new Date().toISOString()} port ${PORT} is taken, a server already runs\n`)
     process.exit(0)
   }
   throw error
 }
 
 writeFileSync(configPath, JSON.stringify({ port: PORT, token, pid: process.pid, version: VERSION, url: `http://${HOST}:${PORT}/?token=${token}` }))
-process.stdout.write(`listening http://${HOST}:${PORT} (lookout ${VERSION})\n`)
+process.stdout.write(`${new Date().toISOString()} listening http://${HOST}:${PORT} (lookout ${VERSION}, pid ${process.pid})\n`)

@@ -631,6 +631,12 @@ function renderLimits() {
   $('limits').innerHTML = html || '<span class="hint" title="Limits show after a turn of a session with the lookout mod">limits: -</span>'
   $('limits').style.display = 'inline-flex'
   $('limits').style.gap = '14px'
+  const update = state.update
+  $('update').hidden = !update
+  if (update) {
+    $('update').textContent = `Lookout ${update.latest} available`
+    $('update').title = `Running ${update.installed}. Update: ${update.how || 'claude plugin update lookout@lookout'}, then start a new session.`
+  }
   const working = state.sessions.filter(s => s.status === 'busy').length
   $('live-text').textContent = `${state.sessions.length} live · ${working} working · ${clock(state.now)}`
   const waiting = openSessions().length

@@ -107,6 +107,7 @@ export type Snapshot = {
   costUsd?: number
   hub?: HubCounts
   cacheTax?: string
+  update?: string
 }
 
 export type HubCounts = { others: number; waiting: number; working: number }

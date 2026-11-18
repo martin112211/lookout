@@ -37,6 +37,7 @@ async function refresh() {
     state.sessions = data.sessions
     state.now = data.now
     state.messaging = data.messaging
+    state.update = data.update
     state.repos = data.repos || []
     state.leases = data.leases || []
     state.budget = data.budget || { limits: [], burn: [] }

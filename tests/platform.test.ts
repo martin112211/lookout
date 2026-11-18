@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { isOlderVersion } from '../hooks/config'
 import { isSameDecision } from '../hooks/decisions'
 import { browserArgv, focusSessionArgv, parseProcessInfo, tabArgv } from '../hooks/terminal'
+import { isOlderVersion, latestTag } from '../hooks/update'
 
 const FORK = { cwd: '/Users/me/repo it', title: 'Fork: x', command: ['claude', '--resume', 'abc', '--fork-session'] }
 
@@ -74,5 +74,10 @@ describe('server version', () => {
     expect(isOlderVersion('0.5.10', '0.5.9')).toBe(false)
     expect(isOlderVersion('0.6.0', '0.5.9')).toBe(false)
     expect(isOlderVersion('0.5.6', '0.5.6')).toBe(false)
+  })
+  test('the newest release tag wins, other tags are ignored', async () => {
+    const out = ['a\trefs/tags/v0.5.9', 'b\trefs/tags/v0.5.10', 'c\trefs/tags/lookout--v0.6.0', 'd\trefs/tags/v0.7.0-beta', 'e\trefs/tags/other--v9.0.0'].join('\n')
+    expect(latestTag(out)).toBe('0.6.0')
+    expect(latestTag('')).toBe(undefined)
   })
 })

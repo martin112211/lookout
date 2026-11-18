@@ -93,6 +93,7 @@ const FEATURE_HELP = {
   skinsColors: 'Uses the colours of the skins mod when it is installed, else the built-in palette.',
   cacheTax: 'Moves the cache-tax status line into the status line when cache-tax is installed.',
   pinBrief: 'Keeps each session\'s Goal and Next (or what it waits for) above its prompt. Needs the session brief.',
+  updateCheck: 'Once a day, asks the repository Lookout was installed from (git ls-remote) for its newest release tag. Sends nothing else.',
 }
 
 async function loadSettings() {
